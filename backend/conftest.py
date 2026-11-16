@@ -32,6 +32,7 @@ import app.modules.k02_subject_workspace.domain.models  # noqa: F401,E402
 import app.modules.k05_knowledge_continuity.domain.models  # noqa: F401,E402
 import app.modules.k04_missions.domain.models  # noqa: F401,E402
 import app.modules.k03_adaptive_learning.domain.models  # noqa: F401,E402
+import app.modules.k09_class_overview.domain.models  # noqa: F401,E402
 
 
 @pytest.fixture()

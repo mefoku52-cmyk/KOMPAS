@@ -15,11 +15,11 @@ CREATE TABLE progress_adaptive_recommendation (
 	FOREIGN KEY(topic_id) REFERENCES curriculum_topic (id)
 );
 
-CREATE INDEX ix_progress_adaptive_recommendation_topic_id ON progress_adaptive_recommendation (topic_id);
+CREATE INDEX ix_progress_adaptive_recommendation_school_id ON progress_adaptive_recommendation (school_id);
 
 CREATE INDEX ix_progress_adaptive_recommendation_student_user_id ON progress_adaptive_recommendation (student_user_id);
 
-CREATE INDEX ix_progress_adaptive_recommendation_school_id ON progress_adaptive_recommendation (school_id);
+CREATE INDEX ix_progress_adaptive_recommendation_topic_id ON progress_adaptive_recommendation (topic_id);
 
 CREATE TABLE progress_student_profile (
 	id UUID NOT NULL, 
