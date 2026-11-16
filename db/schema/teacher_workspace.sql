@@ -16,9 +16,9 @@ CREATE TABLE teacher_workspace_assistant_draft (
 	FOREIGN KEY(teacher_user_id) REFERENCES identity_user (id)
 );
 
-CREATE INDEX ix_teacher_workspace_assistant_draft_teacher_user_id ON teacher_workspace_assistant_draft (teacher_user_id);
-
 CREATE INDEX ix_teacher_workspace_assistant_draft_school_id ON teacher_workspace_assistant_draft (school_id);
+
+CREATE INDEX ix_teacher_workspace_assistant_draft_teacher_user_id ON teacher_workspace_assistant_draft (teacher_user_id);
 
 CREATE TABLE teacher_workspace_library_item (
 	id UUID NOT NULL, 
