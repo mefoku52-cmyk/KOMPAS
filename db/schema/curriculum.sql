@@ -13,8 +13,6 @@ CREATE TABLE curriculum_subject (
 
 CREATE INDEX ix_curriculum_subject_school_id ON curriculum_subject (school_id);
 
-CREATE INDEX ix_curriculum_subject_school_id ON curriculum_subject (school_id);
-
 CREATE TABLE curriculum_topic (
 	id UUID NOT NULL, 
 	school_id UUID NOT NULL, 
@@ -39,9 +37,3 @@ CREATE INDEX ix_curriculum_topic_subject_id ON curriculum_topic (subject_id);
 CREATE INDEX ix_curriculum_topic_parent_topic_id ON curriculum_topic (parent_topic_id);
 
 CREATE INDEX ix_curriculum_topic_school_id ON curriculum_topic (school_id);
-
-CREATE INDEX ix_curriculum_topic_parent_topic_id ON curriculum_topic (parent_topic_id);
-
-CREATE INDEX ix_curriculum_topic_school_id ON curriculum_topic (school_id);
-
-CREATE INDEX ix_curriculum_topic_subject_id ON curriculum_topic (subject_id);

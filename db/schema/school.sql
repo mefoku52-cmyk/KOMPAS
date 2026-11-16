@@ -18,10 +18,6 @@ CREATE INDEX ix_school_class_group_school_year_id ON school_class_group (school_
 
 CREATE INDEX ix_school_class_group_school_id ON school_class_group (school_id);
 
-CREATE INDEX ix_school_class_group_school_id ON school_class_group (school_id);
-
-CREATE INDEX ix_school_class_group_school_year_id ON school_class_group (school_year_id);
-
 CREATE TABLE school_enrollment (
 	id UUID NOT NULL, 
 	school_id UUID NOT NULL, 
@@ -43,14 +39,6 @@ CREATE TABLE school_enrollment (
 CREATE INDEX ix_school_enrollment_school_id ON school_enrollment (school_id);
 
 CREATE INDEX ix_school_enrollment_class_group_id ON school_enrollment (class_group_id);
-
-CREATE INDEX ix_school_enrollment_school_year_id ON school_enrollment (school_year_id);
-
-CREATE INDEX ix_school_enrollment_student_user_id ON school_enrollment (student_user_id);
-
-CREATE INDEX ix_school_enrollment_class_group_id ON school_enrollment (class_group_id);
-
-CREATE INDEX ix_school_enrollment_school_id ON school_enrollment (school_id);
 
 CREATE INDEX ix_school_enrollment_school_year_id ON school_enrollment (school_year_id);
 
@@ -79,7 +67,5 @@ CREATE TABLE school_year (
 	CONSTRAINT uq_school_year_school_name UNIQUE (school_id, name), 
 	FOREIGN KEY(school_id) REFERENCES school_school (id)
 );
-
-CREATE INDEX ix_school_year_school_id ON school_year (school_id);
 
 CREATE INDEX ix_school_year_school_id ON school_year (school_id);
