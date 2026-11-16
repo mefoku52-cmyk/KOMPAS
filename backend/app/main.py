@@ -15,7 +15,9 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
 
     # Module registration mechanism: each module exposes register(app, bus)
-    module_registrars = []
+    from app.modules.k16_intelligent_core import register as register_k16
+
+    module_registrars = [register_k16]
     for registrar in module_registrars:
         registrar(app, bus)
 
