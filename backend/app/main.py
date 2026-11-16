@@ -17,8 +17,9 @@ def create_app() -> FastAPI:
     # Module registration mechanism: each module exposes register(app, bus)
     from app.modules.k16_intelligent_core import register as register_k16
     from app.modules.k01_learning_profile import register as register_k01
+    from app.modules.k02_subject_workspace import register as register_k02
 
-    module_registrars = [register_k16, register_k01]
+    module_registrars = [register_k16, register_k01, register_k02]
     for registrar in module_registrars:
         registrar(app, bus)
 
