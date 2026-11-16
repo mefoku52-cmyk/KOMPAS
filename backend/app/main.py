@@ -22,7 +22,9 @@ def create_app() -> FastAPI:
     from app.modules.k04_missions import register as register_k04
     from app.modules.k03_adaptive_learning import register as register_k03
 
-    module_registrars = [register_k16, register_k01, register_k02, register_k05, register_k04, register_k03]
+    from app.modules.k09_class_overview import register as register_k09
+
+    module_registrars = [register_k16, register_k01, register_k02, register_k05, register_k04, register_k03, register_k09]
     for registrar in module_registrars:
         registrar(app, bus)
 
