@@ -124,4 +124,6 @@ def test_main_event_flow_end_to_end(db_session, monkeypatch):
     assert agg["total_students"] == 5
 
     # 7) audit chain valid after flow
-    assert verify_chain(db_session) is True
+    ok, bad_id = verify_chain(db_session)
+    assert ok is True
+    assert bad_id is None
