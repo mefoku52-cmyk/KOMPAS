@@ -347,3 +347,152 @@ Inventár: backend/app, backend/tests, frontend/src, scripts, db, docs. Python a
 | `docs/modules/K-16.md` | 36 | K-16.md | hotový |
 | `docs/permissions/README.md` | 36 | README.md | hotový |
 | `docs/research/README.md` | 0 | README.md | stub |
+
+## 8.3 Porovnanie modulov K-01 až K-16
+
+Porovnanie so sekciou 7 `docs/OPENCODE_PROMPT.md` a `docs/modules/K-XX.md`. Stav vychádza z prítomnosti vrstiev, service logiky, testov a reálne vystavených API endpointov (OpenAPI).
+
+### K-16 - Inteligentné jadro
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | orchestrator ModelProvider/NullProvider, výber podľa úlohy, volanie cez rule_system+audit<br>knowledge_system register schválených zdrojov, vyhľadávanie iba nad schválenými (KnowledgeIndex)<br>context_memory s odkazom na zdrojový štruktúrovaný záznam a platnosťou, nie zdroj pravdy<br>rule_system povolené polia, zakázané akcie (pedagogické rozhodnutia, hodnotenie osobnosti), povolenie/zamietnutie<br>analytics_engine spracovanie udalostí na agregáty<br>audit_engine iba čítanie/dotazy nad auditom |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>testy: test_service.py<br>podsystémy: analytics_engine, audit_engine, context_memory, knowledge_system, orchestrator, rule_system<br>požiadavka pokrytá v kóde/docs: orchestrator ModelProvider/NullProvider, výber podľa úlohy, volanie cez rule_system+audit<br>požiadavka pokrytá v kóde/docs: knowledge_system register schválených zdrojov, vyhľadávanie iba nad schválenými (KnowledgeIndex)<br>požiadavka pokrytá v kóde/docs: context_memory s odkazom na zdrojový štruktúrovaný záznam a platnosťou, nie zdroj pravdy<br>požiadavka pokrytá v kóde/docs: rule_system povolené polia, zakázané akcie (pedagogické rozhodnutia, hodnotenie osobnosti), povolenie/zamietnutie<br>požiadavka pokrytá v kóde/docs: analytics_engine spracovanie udalostí na agregáty<br>požiadavka pokrytá v kóde/docs: audit_engine iba čítanie/dotazy nad auditom |
+| Chýbajúce / medzery | bez UI integrácie (frontend dlaždice) okrem status endpointu; externí poskytovatelia zámerne nie (P6) |
+| Endpointy (OpenAPI) | `GET /k16/status` |
+| Testy | `backend/app/modules/k16_intelligent_core/tests/test_service.py` |
+
+### K-01 - Osobný vzdelávací profil
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | profil žiaka na školský rok a ročník<br>história sa nikdy neprepisuje (nový záznam na nový rok)<br>prehľad histórie |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>základná funkcionalita podľa docs/modules a service vrstvy |
+| Chýbajúce / medzery | API pokrýva najmä status; chýbajú doménové endpointy pre UI |
+| Endpointy (OpenAPI) | `GET /k01/status` |
+| Testy | `backend/app/modules/k01_learning_profile/tests/test_service.py` |
+
+### K-02 - Predmetové prostredie
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | predmet a konfigurovateľný strom učiva učiteľa (poradie,vnorenie)<br>podľa existujúceho plánu, bez núteného meniaceho sa rozvrhu |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>základná funkcionalita podľa docs/modules a service vrstvy |
+| Chýbajúce / medzery | API pokrýva najmä status; chýbajú doménové endpointy pre UI |
+| Endpointy (OpenAPI) | `GET /k02/status` |
+| Testy | `backend/app/modules/k02_subject_workspace/tests/test_service.py` |
+
+### K-05 - Znalostná kontinuita
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | záznam stavu témy: druhy prebraté/precvičené/overené; stavy prebiehajúce precvičovanie, čiastočne zvládnuté, overené zvládnutie<br>každá zmena má dôkaz (odkaz na pokus) a platnosť<br>overené zvládnutie iba z overovacieho pokusu, nikdy z precvičovania<br>odoberá udalosť vyhodnotenia odpovede |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>odber AnswerEvaluated v event handleri<br>rozlíšenie druhov/stavov a dôkaz v doméne/service (podľa docs/testov) |
+| Chýbajúce / medzery | API pre čítanie/zápis stavov nie je vystavené (len status) |
+| Endpointy (OpenAPI) | `GET /k05/status` |
+| Testy | `backend/app/modules/k05_knowledge_continuity/tests/test_service.py` |
+
+### K-04 - Vzdelávacie misie
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | misia, úlohy (výber, číselná odpoveď, text so zhodou) s deterministickým vyhodnotením<br>pokus žiaka<br>publikovanie udalosti AnswerEvaluated |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>publikovanie udalosti AnswerEvaluated<br>deterministické vyhodnotenie typov úloh v service vrstve |
+| Chýbajúce / medzery | verejné API pokrýva najmä status; chýbajú CRUD/submit endpointy pre UI tok |
+| Endpointy (OpenAPI) | `GET /k04/status` |
+| Testy | `backend/app/modules/k04_missions/tests/test_service.py` |
+
+### K-03 - Adaptívne učenie
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | odporúčanie ďalšieho precvičovania z K-05<br>deterministické a vysvetliteľné (dôvod)<br>bez odvodzovania vlastností osobnosti<br>odporúčanie je návrh, učiteľ môže zmeniť |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>deterministické vysvetliteľné odporúčania s dôvodom |
+| Chýbajúce / medzery | API endpoint na získanie odporúčaní pre UI chýba (len status) |
+| Endpointy (OpenAPI) | `GET /k03/status` |
+| Testy | `backend/app/modules/k03_adaptive_learning/tests/test_service.py` |
+
+### K-09 - Triedny prehľad
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | rozdelenie stavov učiva v triede<br>iba pre triedy daného učiteľa |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>triedny prehľad v service vrstve (agregácia stavov) |
+| Chýbajúce / medzery | API endpoint prehľadu triedy pre učiteľa chýba (len status) |
+| Endpointy (OpenAPI) | `GET /k09/status` |
+| Testy | `backend/app/modules/k09_class_overview/tests/test_service.py` |
+
+### K-07 - Profesionálna knižnica
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | položky vlastnené učiteľom, verzie, štítky<br>archív prežívajúci zmenu školského roka<br>súbory cez FileStorage |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>základná funkcionalita podľa docs/modules a service vrstvy |
+| Chýbajúce / medzery | API pokrýva najmä status; chýbajú doménové endpointy pre UI |
+| Endpointy (OpenAPI) | `GET /k07/status` |
+| Testy | `backend/app/modules/k07_professional_library/tests/test_service.py` |
+
+### K-08 - Pracovný asistent
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | návrh pracovného listu/testu z knižnice a učiva cez orchestrátor<br>výstup je koncept vyžadujúci schválenie učiteľom<br>funguje aj bez AI (šablónový režim) |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>základná funkcionalita podľa docs/modules a service vrstvy |
+| Chýbajúce / medzery | API pokrýva najmä status; chýbajú doménové endpointy pre UI |
+| Endpointy (OpenAPI) | `GET /k08/status` |
+| Testy | `backend/app/modules/k08_work_assistant/tests/test_service.py` |
+
+### K-10 - Organizačné centrum
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | úlohy, termíny, plán školy, priradenia |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>základná funkcionalita podľa docs/modules a service vrstvy |
+| Chýbajúce / medzery | API pokrýva najmä status; chýbajú doménové endpointy pre UI |
+| Endpointy (OpenAPI) | `GET /k10/status` |
+| Testy | `backend/app/modules/k10_organization_center/tests/test_service.py` |
+
+### K-11 - Prevádzkové centrum
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | požiadavky na priestory a vybavenie so stavovým tokom |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>základná funkcionalita podľa docs/modules a service vrstvy |
+| Chýbajúce / medzery | API pokrýva najmä status; chýbajú doménové endpointy pre UI |
+| Endpointy (OpenAPI) | `GET /k11/status` |
+| Testy | `backend/app/modules/k11_operations_center/tests/test_service.py` |
+
+### K-12 - Analytické centrum
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | agregované prehľady školy<br>skupiny menšie než prah (predvolene 5) sa potláčajú<br>individuálne údaje iba s uvedeným účelom (audit) |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>agregácie, prah potlačenia a účel pri individuálnych údajoch v service vrstve |
+| Chýbajúce / medzery | žiadny endpoint v OpenAPI (router bez ciest) |
+| Endpointy (OpenAPI) | žiadne (okrem prípadného neexportovaného) |
+| Testy | `backend/app/modules/k12_analytics_center/tests/test_service.py` |
+
+### K-13 - Rodičovské centrum
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | väzba rodič-dieťa<br>prehľad schválených informácií o vlastnom dieťati<br>rodič nikdy nevidí súkromné poznámky učiteľa |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>väzba rodič-dieťa a filtrovanie schválených informácií v service vrstve |
+| Chýbajúce / medzery | žiadny endpoint v OpenAPI (router bez ciest) |
+| Endpointy (OpenAPI) | žiadne (okrem prípadného neexportovaného) |
+| Testy | `backend/app/modules/k13_parent_center/tests/test_service.py` |
+
+### K-14 - Komunikačné centrum
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | vlákna a správy medzi povolenými účastníkmi<br>súkromné vlákna viditeľné iba účastníkom<br>prístup k obsahu sa audituje |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>vlákna/správy/účastníci a kontrola prístupu v service/doméne |
+| Chýbajúce / medzery | žiadny endpoint v OpenAPI (router bez ciest) |
+| Endpointy (OpenAPI) | žiadne (okrem prípadného neexportovaného) |
+| Testy | `backend/app/modules/k14_communication_center/tests/test_service.py` |
+
+### K-15 - Spolupráca a projekty
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | projekt, členovia (aj medziročníkoví), úlohy, odovzdania |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>projekty/členovia/úlohy/odovzdania v service/doméne |
+| Chýbajúce / medzery | žiadny endpoint v OpenAPI (router bez ciest) |
+| Endpointy (OpenAPI) | žiadne (okrem prípadného neexportovaného) |
+| Testy | `backend/app/modules/k15_collaboration_projects/tests/test_service.py` |
+
+### K-06 - Virtuálne laboratórium
+| Oblasť | Obsah |
+|---|---|
+| Požadované funkcie (sekcia 7) | dátovo riadený rámec simulácií (parametre a deterministická funkcia v registri)<br>jedna ukážková simulácia |
+| Hotové (kód/testy/docs) | štruktúra a-g (domain/repo/service/events/api/tests)<br>autorizácia/audit v service vrstve (podľa implementácie)<br>testy: test_service.py<br>rámec simulácií a ukážková simulácia v service/doméne |
+| Chýbajúce / medzery | žiadny endpoint v OpenAPI (router bez ciest) |
+| Endpointy (OpenAPI) | žiadne (okrem prípadného neexportovaného) |
+| Testy | `backend/app/modules/k06_virtual_lab/tests/test_service.py` |
+
