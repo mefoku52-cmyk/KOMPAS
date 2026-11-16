@@ -6,7 +6,7 @@ from app.core.security.routes import router as auth_router
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.app_name)
+    app = FastAPI(title=settings.app_name, docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.get("/health")
     def health():
