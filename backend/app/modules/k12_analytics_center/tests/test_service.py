@@ -1,9 +1,10 @@
 import uuid
+from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy import insert
 
-from app.modules.k05_knowledge_continuity.domain.models import TopicProgressKind, TopicProgressStatus
-from app.modules.k05_knowledge_continuity.services.service import K05Service
+from app.core.database.session import Base
 from app.modules.k12_analytics_center.services.service import K12Service
 from app.shared.curriculum import Subject, Topic
 from app.shared.identity import User
@@ -33,25 +34,29 @@ def _setup_school(db_session, *, student_count: int):
 
 
 def _seed_states(db_session, school_id, student_ids):
-    k05 = K05Service(db_session)
-    sys_p = Principal(user_id=uuid.uuid4(), role=None, school_id=school_id, scopes=(), is_system=True)
     subject_id = uuid.uuid4()
     db_session.add(Subject(id=subject_id, school_id=school_id, name=f"Subj-{subject_id}"))
     db_session.commit()
+    table = Base.metadata.tables["progress_topic_state"]
+    ts = datetime(2026, 1, 1, tzinfo=timezone.utc)
     for sid in student_ids:
         topic_id = uuid.uuid4()
         db_session.add(Topic(id=topic_id, school_id=school_id, subject_id=subject_id, name=f"T-{topic_id}", grade=1, order_index=1))
         db_session.commit()
-        k05.record_state(
-            sys_p,
+        db_session.execute(insert(table).values(
+            id=uuid.uuid4(),
             school_id=school_id,
             student_user_id=sid,
             topic_id=topic_id,
-            kind=TopicProgressKind.PRACTICED,
-            status=TopicProgressStatus.PARTIALLY_MASTERED,
+            kind="practiced",
+            status="partially_mastered",
             evidence_attempt_ref=str(uuid.uuid4()),
             is_verification_evidence=False,
-        )
+            valid_from=ts,
+            valid_to=None,
+            version=1,
+            is_demo=False,
+        ))
     db_session.commit()
 
 
