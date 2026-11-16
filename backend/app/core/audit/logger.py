@@ -35,13 +35,21 @@ def _canonical(payload: dict[str, Any]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
 
 
+def _ts_iso(ts: datetime) -> str:
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(timezone.utc).isoformat()
+
+
 def compute_record_hash(payload: dict[str, Any], prev_hash: str) -> str:
     data = {"prev_hash": prev_hash, **payload}
     return hashlib.sha256(_canonical(data).encode("utf-8")).hexdigest()
 
 
 def _last_hash(db: Session) -> str:
-    row = db.execute(select(AuditLog.record_hash).order_by(AuditLog.timestamp.desc(), AuditLog.id.desc()).limit(1)).scalar_one_or_none()
+    row = db.execute(
+        select(AuditLog.record_hash).order_by(AuditLog.timestamp.desc(), AuditLog.id.desc()).limit(1)
+    ).scalar_one_or_none()
     return row or GENESIS_HASH
 
 
@@ -58,7 +66,7 @@ def write(
     ts = timestamp or utc_now()
     prev_hash = _last_hash(db)
     payload = {
-        "timestamp": ts.isoformat(),
+        "timestamp": _ts_iso(ts),
         "principal_id": str(principal.user_id) if principal else None,
         "principal_role": principal.role.value if principal and principal.role else None,
         "school_id": str(principal.school_id) if principal and principal.school_id else None,
@@ -93,7 +101,7 @@ def verify_chain(db: Session) -> tuple[bool, Optional[str]]:
     prev_hash = GENESIS_HASH
     for row in rows:
         payload = {
-            "timestamp": row.timestamp.isoformat(),
+            "timestamp": _ts_iso(row.timestamp),
             "principal_id": str(row.principal_id) if row.principal_id else None,
             "principal_role": row.principal_role,
             "school_id": str(row.school_id) if row.school_id else None,
