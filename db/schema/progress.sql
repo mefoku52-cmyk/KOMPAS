@@ -16,8 +16,8 @@ CREATE TABLE progress_student_profile (
 	FOREIGN KEY(school_year_id) REFERENCES school_year (id)
 );
 
-CREATE INDEX ix_progress_student_profile_school_id ON progress_student_profile (school_id);
+CREATE INDEX ix_progress_student_profile_student_user_id ON progress_student_profile (student_user_id);
 
 CREATE INDEX ix_progress_student_profile_school_year_id ON progress_student_profile (school_year_id);
 
-CREATE INDEX ix_progress_student_profile_student_user_id ON progress_student_profile (student_user_id);
+CREATE INDEX ix_progress_student_profile_school_id ON progress_student_profile (school_id);
