@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend" / "src"
 OPENAPI = ROOT / "docs" / "api-contracts" / "openapi.json"
 
-# moduly bez akéhokoľvek UI (mapovanie na frontend stránky/volania)
 MODULE_UI = {
     "K-01": "student",
     "K-02": "teacher",
@@ -36,15 +35,10 @@ MODULE_UI = {
 
 def extract_frontend_paths() -> set[str]:
     paths: set[str] = set()
-    # apiFetch("/path") / fetch(`${API_BASE}/path`) / login uses /auth/login internally
-    patterns = [
-        re.compile(r"apiFetch\s*(?:<[^>]*>)?\(\s*[`'\"](/[^`'\"]*)[`'\"]"),
-        re.compile(r"fetch\s*\(\s*(?:`\$\{API_BASE\}(/[^`\"']*)`|[`'\"][^`'\"]*(/[^`'\"]*)[`'\"])"),
-        re.compile(r"['\"](/auth/login)['\"]"),
-        re.compile(r"['\"](/health)['\"]"),
-        re.compile(r"['\"](/k\d{2}/[^'\"]+)['\"]"),
-        re.compile(r"['\"](/(?:lab|analytics|parent|communication|projects)(?:/[^'\"]*)?)['\"]"),
-    ]
+    # only explicit HTTP calls via apiFetch/fetch with API base or known API literals
+    api_call = re.compile(r"apiFetch\s*(?:<[^>]*>)?\(\s*[`'\"](/[^`'\"]*)[`'\"]")
+    fetch_call = re.compile(r"fetch\s*\(\s*`\$\{API_BASE\}(/[^`'\"]*)`")
+    # direct API string literals used as request paths (exclude route segments like href)
     for p in FRONTEND.rglob("*"):
         if p.suffix not in {".ts", ".tsx", ".js", ".jsx"}:
             continue
@@ -52,14 +46,15 @@ def extract_frontend_paths() -> set[str]:
             text = p.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        for pat in patterns:
-            for m in pat.finditer(text):
-                # pick first non-empty group
-                val = next((g for g in m.groups() if g), None)
-                if val and val.startswith("/"):
-                    # normalize template remnants
-                    val = re.sub(r"\$\{[^}]+\}", "{param}", val)
-                    paths.add(val.split("?")[0])
+        for m in api_call.finditer(text):
+            val = re.sub(r"\$\{[^}]+\}", "{param}", m.group(1)).split("?")[0]
+            paths.add(val)
+        for m in fetch_call.finditer(text):
+            val = re.sub(r"\$\{[^}]+\}", "{param}", m.group(1)).split("?")[0]
+            paths.add(val)
+        # login endpoint literal
+        if '"/auth/login"' in text or "'/auth/login'" in text:
+            paths.add("/auth/login")
     return paths
 
 
@@ -77,21 +72,23 @@ def main() -> int:
     fe_paths = extract_frontend_paths()
     oa_paths = load_openapi_paths()
 
-    # compare: frontend-called paths must exist in openapi
     missing_in_openapi = sorted(fe_paths - oa_paths)
     unused_in_frontend = sorted(oa_paths - fe_paths)
 
     modules_without_ui = []
-    # modules without any direct API call from frontend beyond auth/health/status? treat as without real UI integration
-    fe_text = "\n".join(p.read_text(encoding="utf-8", errors="ignore") for p in FRONTEND.rglob("*.tsx") if p.is_file())
+    fe_text = "\n".join(
+        p.read_text(encoding="utf-8", errors="ignore")
+        for p in FRONTEND.rglob("*")
+        if p.is_file() and p.suffix in {".ts", ".tsx", ".js", ".jsx"}
+    )
     for mod, area in MODULE_UI.items():
-        token = mod.lower().replace("-", "")  # k-01 -> k01
         num = mod.split("-")[1]
-        has_call = (f"/k{num}" in fe_text) or (f"{mod}" in fe_text)
-        # special prefixes
-        special = {"K-06": "/lab", "K-12": "/analytics", "K-13": "/parent", "K-14": "/communication", "K-15": "/projects"}
+        has_call = (f"/k{num}" in fe_text)
+        special = {"K-06": "/lab", "K-12": "/analytics", "K-13": "/parent/", "K-14": "/communication", "K-15": "/projects"}
         if mod in special:
-            has_call = special[mod] in fe_text
+            tok = special[mod]
+            # require API-like usage, not just route segment coincidence
+            has_call = (f'apiFetch("{tok}' in fe_text) or (f"apiFetch('{tok}" in fe_text) or (f"API_BASE}}{tok}" in fe_text) or (f"/k{num}" in fe_text)
         if not has_call:
             modules_without_ui.append(f"{mod} ({area})")
 
