@@ -41,6 +41,49 @@ CREATE INDEX ix_learning_mission_topic_id ON learning_mission (topic_id);
 
 CREATE INDEX ix_learning_mission_school_id ON learning_mission (school_id);
 
+CREATE TABLE learning_simulation_definition (
+	id UUID NOT NULL, 
+	school_id UUID, 
+	key VARCHAR(128) NOT NULL, 
+	name VARCHAR(255) NOT NULL, 
+	description TEXT, 
+	param_schema TEXT, 
+	compute_key VARCHAR(128) NOT NULL, 
+	is_active BOOLEAN NOT NULL, 
+	valid_from TIMESTAMP WITH TIME ZONE NOT NULL, 
+	valid_to TIMESTAMP WITH TIME ZONE, 
+	version INTEGER NOT NULL, 
+	is_demo BOOLEAN NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(school_id) REFERENCES school_school (id), 
+	UNIQUE (key)
+);
+
+CREATE INDEX ix_learning_simulation_definition_school_id ON learning_simulation_definition (school_id);
+
+CREATE TABLE learning_simulation_run (
+	id UUID NOT NULL, 
+	school_id UUID NOT NULL, 
+	definition_id UUID NOT NULL, 
+	user_id UUID NOT NULL, 
+	inputs TEXT NOT NULL, 
+	outputs TEXT NOT NULL, 
+	valid_from TIMESTAMP WITH TIME ZONE NOT NULL, 
+	valid_to TIMESTAMP WITH TIME ZONE, 
+	version INTEGER NOT NULL, 
+	is_demo BOOLEAN NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(school_id) REFERENCES school_school (id), 
+	FOREIGN KEY(definition_id) REFERENCES learning_simulation_definition (id), 
+	FOREIGN KEY(user_id) REFERENCES identity_user (id)
+);
+
+CREATE INDEX ix_learning_simulation_run_definition_id ON learning_simulation_run (definition_id);
+
+CREATE INDEX ix_learning_simulation_run_school_id ON learning_simulation_run (school_id);
+
+CREATE INDEX ix_learning_simulation_run_user_id ON learning_simulation_run (user_id);
+
 CREATE TABLE learning_task (
 	id UUID NOT NULL, 
 	school_id UUID NOT NULL, 
