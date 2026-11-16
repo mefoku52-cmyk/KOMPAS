@@ -16,9 +16,9 @@ CREATE TABLE teacher_workspace_assistant_draft (
 	FOREIGN KEY(teacher_user_id) REFERENCES identity_user (id)
 );
 
-CREATE INDEX ix_teacher_workspace_assistant_draft_school_id ON teacher_workspace_assistant_draft (school_id);
-
 CREATE INDEX ix_teacher_workspace_assistant_draft_teacher_user_id ON teacher_workspace_assistant_draft (teacher_user_id);
+
+CREATE INDEX ix_teacher_workspace_assistant_draft_school_id ON teacher_workspace_assistant_draft (school_id);
 
 CREATE TABLE teacher_workspace_library_item (
 	id UUID NOT NULL, 
@@ -55,9 +55,9 @@ CREATE TABLE teacher_workspace_library_tag (
 	FOREIGN KEY(item_id) REFERENCES teacher_workspace_library_item (id)
 );
 
-CREATE INDEX ix_teacher_workspace_library_tag_school_id ON teacher_workspace_library_tag (school_id);
-
 CREATE INDEX ix_teacher_workspace_library_tag_item_id ON teacher_workspace_library_tag (item_id);
+
+CREATE INDEX ix_teacher_workspace_library_tag_school_id ON teacher_workspace_library_tag (school_id);
 
 CREATE TABLE teacher_workspace_library_version (
 	id UUID NOT NULL, 
@@ -77,6 +77,6 @@ CREATE TABLE teacher_workspace_library_version (
 	FOREIGN KEY(item_id) REFERENCES teacher_workspace_library_item (id)
 );
 
-CREATE INDEX ix_teacher_workspace_library_version_school_id ON teacher_workspace_library_version (school_id);
-
 CREATE INDEX ix_teacher_workspace_library_version_item_id ON teacher_workspace_library_version (item_id);
+
+CREATE INDEX ix_teacher_workspace_library_version_school_id ON teacher_workspace_library_version (school_id);

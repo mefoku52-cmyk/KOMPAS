@@ -16,11 +16,11 @@ CREATE TABLE learning_attempt (
 	FOREIGN KEY(student_user_id) REFERENCES identity_user (id)
 );
 
+CREATE INDEX ix_learning_attempt_task_id ON learning_attempt (task_id);
+
 CREATE INDEX ix_learning_attempt_school_id ON learning_attempt (school_id);
 
 CREATE INDEX ix_learning_attempt_student_user_id ON learning_attempt (student_user_id);
-
-CREATE INDEX ix_learning_attempt_task_id ON learning_attempt (task_id);
 
 CREATE TABLE learning_mission (
 	id UUID NOT NULL, 
@@ -37,9 +37,9 @@ CREATE TABLE learning_mission (
 	FOREIGN KEY(topic_id) REFERENCES curriculum_topic (id)
 );
 
-CREATE INDEX ix_learning_mission_school_id ON learning_mission (school_id);
-
 CREATE INDEX ix_learning_mission_topic_id ON learning_mission (topic_id);
+
+CREATE INDEX ix_learning_mission_school_id ON learning_mission (school_id);
 
 CREATE TABLE learning_task (
 	id UUID NOT NULL, 
@@ -58,6 +58,6 @@ CREATE TABLE learning_task (
 	FOREIGN KEY(mission_id) REFERENCES learning_mission (id)
 );
 
-CREATE INDEX ix_learning_task_mission_id ON learning_task (mission_id);
-
 CREATE INDEX ix_learning_task_school_id ON learning_task (school_id);
+
+CREATE INDEX ix_learning_task_mission_id ON learning_task (mission_id);

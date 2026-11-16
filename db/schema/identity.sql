@@ -14,9 +14,9 @@ CREATE TABLE identity_guardian_link (
 	FOREIGN KEY(child_user_id) REFERENCES identity_user (id)
 );
 
-CREATE INDEX ix_identity_guardian_link_guardian_user_id ON identity_guardian_link (guardian_user_id);
-
 CREATE INDEX ix_identity_guardian_link_child_user_id ON identity_guardian_link (child_user_id);
+
+CREATE INDEX ix_identity_guardian_link_guardian_user_id ON identity_guardian_link (guardian_user_id);
 
 CREATE INDEX ix_identity_guardian_link_school_id ON identity_guardian_link (school_id);
 

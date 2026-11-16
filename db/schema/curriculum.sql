@@ -55,11 +55,11 @@ CREATE TABLE curriculum_topic (
 	FOREIGN KEY(parent_topic_id) REFERENCES curriculum_topic (id)
 );
 
+CREATE INDEX ix_curriculum_topic_school_id ON curriculum_topic (school_id);
+
 CREATE INDEX ix_curriculum_topic_subject_id ON curriculum_topic (subject_id);
 
 CREATE INDEX ix_curriculum_topic_parent_topic_id ON curriculum_topic (parent_topic_id);
-
-CREATE INDEX ix_curriculum_topic_school_id ON curriculum_topic (school_id);
 
 CREATE TABLE curriculum_workspace_topic_node (
 	id UUID NOT NULL, 
@@ -80,10 +80,10 @@ CREATE TABLE curriculum_workspace_topic_node (
 	FOREIGN KEY(parent_node_id) REFERENCES curriculum_workspace_topic_node (id)
 );
 
-CREATE INDEX ix_curriculum_workspace_topic_node_school_id ON curriculum_workspace_topic_node (school_id);
-
-CREATE INDEX ix_curriculum_workspace_topic_node_topic_id ON curriculum_workspace_topic_node (topic_id);
-
 CREATE INDEX ix_curriculum_workspace_topic_node_parent_node_id ON curriculum_workspace_topic_node (parent_node_id);
 
 CREATE INDEX ix_curriculum_workspace_topic_node_workspace_id ON curriculum_workspace_topic_node (workspace_id);
+
+CREATE INDEX ix_curriculum_workspace_topic_node_school_id ON curriculum_workspace_topic_node (school_id);
+
+CREATE INDEX ix_curriculum_workspace_topic_node_topic_id ON curriculum_workspace_topic_node (topic_id);

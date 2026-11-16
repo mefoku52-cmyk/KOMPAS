@@ -14,11 +14,11 @@ CREATE TABLE organization_assignment (
 	FOREIGN KEY(assignee_user_id) REFERENCES identity_user (id)
 );
 
-CREATE INDEX ix_organization_assignment_task_id ON organization_assignment (task_id);
-
 CREATE INDEX ix_organization_assignment_school_id ON organization_assignment (school_id);
 
 CREATE INDEX ix_organization_assignment_assignee_user_id ON organization_assignment (assignee_user_id);
+
+CREATE INDEX ix_organization_assignment_task_id ON organization_assignment (task_id);
 
 CREATE TABLE organization_operation_request (
 	id UUID NOT NULL, 
@@ -37,9 +37,9 @@ CREATE TABLE organization_operation_request (
 	FOREIGN KEY(requester_user_id) REFERENCES identity_user (id)
 );
 
-CREATE INDEX ix_organization_operation_request_requester_user_id ON organization_operation_request (requester_user_id);
-
 CREATE INDEX ix_organization_operation_request_school_id ON organization_operation_request (school_id);
+
+CREATE INDEX ix_organization_operation_request_requester_user_id ON organization_operation_request (requester_user_id);
 
 CREATE TABLE organization_plan (
 	id UUID NOT NULL, 

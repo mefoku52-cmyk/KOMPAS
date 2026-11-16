@@ -14,9 +14,9 @@ CREATE TABLE school_class_group (
 	FOREIGN KEY(school_year_id) REFERENCES school_year (id)
 );
 
-CREATE INDEX ix_school_class_group_school_year_id ON school_class_group (school_year_id);
-
 CREATE INDEX ix_school_class_group_school_id ON school_class_group (school_id);
+
+CREATE INDEX ix_school_class_group_school_year_id ON school_class_group (school_year_id);
 
 CREATE TABLE school_class_teacher (
 	id UUID NOT NULL, 
@@ -34,11 +34,11 @@ CREATE TABLE school_class_teacher (
 	FOREIGN KEY(teacher_user_id) REFERENCES identity_user (id)
 );
 
+CREATE INDEX ix_school_class_teacher_class_group_id ON school_class_teacher (class_group_id);
+
 CREATE INDEX ix_school_class_teacher_teacher_user_id ON school_class_teacher (teacher_user_id);
 
 CREATE INDEX ix_school_class_teacher_school_id ON school_class_teacher (school_id);
-
-CREATE INDEX ix_school_class_teacher_class_group_id ON school_class_teacher (class_group_id);
 
 CREATE TABLE school_enrollment (
 	id UUID NOT NULL, 
@@ -58,13 +58,13 @@ CREATE TABLE school_enrollment (
 	FOREIGN KEY(student_user_id) REFERENCES identity_user (id)
 );
 
-CREATE INDEX ix_school_enrollment_school_id ON school_enrollment (school_id);
-
-CREATE INDEX ix_school_enrollment_class_group_id ON school_enrollment (class_group_id);
-
 CREATE INDEX ix_school_enrollment_school_year_id ON school_enrollment (school_year_id);
 
 CREATE INDEX ix_school_enrollment_student_user_id ON school_enrollment (student_user_id);
+
+CREATE INDEX ix_school_enrollment_class_group_id ON school_enrollment (class_group_id);
+
+CREATE INDEX ix_school_enrollment_school_id ON school_enrollment (school_id);
 
 CREATE TABLE school_school (
 	id UUID NOT NULL, 
