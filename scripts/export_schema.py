@@ -34,6 +34,7 @@ import app.modules.k10_organization_center.domain.models  # noqa: F401,E402
 import app.modules.k11_operations_center.domain.models  # noqa: F401,E402
 import app.modules.k12_analytics_center.domain.models  # noqa: F401,E402
 import app.modules.k14_communication_center.domain.models  # noqa: F401,E402
+import app.modules.k15_collaboration_projects.domain.models  # noqa: F401,E402
 
 AREA_PREFIXES = {
     "identity": "identity_",
