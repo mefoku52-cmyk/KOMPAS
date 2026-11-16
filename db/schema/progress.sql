@@ -15,11 +15,29 @@ CREATE TABLE progress_adaptive_recommendation (
 	FOREIGN KEY(topic_id) REFERENCES curriculum_topic (id)
 );
 
-CREATE INDEX ix_progress_adaptive_recommendation_school_id ON progress_adaptive_recommendation (school_id);
-
 CREATE INDEX ix_progress_adaptive_recommendation_student_user_id ON progress_adaptive_recommendation (student_user_id);
 
 CREATE INDEX ix_progress_adaptive_recommendation_topic_id ON progress_adaptive_recommendation (topic_id);
+
+CREATE INDEX ix_progress_adaptive_recommendation_school_id ON progress_adaptive_recommendation (school_id);
+
+CREATE TABLE progress_analytics_snapshot (
+	id UUID NOT NULL, 
+	school_id UUID NOT NULL, 
+	metric_key VARCHAR(128) NOT NULL, 
+	group_key VARCHAR(255), 
+	group_size INTEGER NOT NULL, 
+	suppressed INTEGER NOT NULL, 
+	value_count INTEGER NOT NULL, 
+	valid_from TIMESTAMP WITH TIME ZONE NOT NULL, 
+	valid_to TIMESTAMP WITH TIME ZONE, 
+	version INTEGER NOT NULL, 
+	is_demo BOOLEAN NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(school_id) REFERENCES school_school (id)
+);
+
+CREATE INDEX ix_progress_analytics_snapshot_school_id ON progress_analytics_snapshot (school_id);
 
 CREATE TABLE progress_student_profile (
 	id UUID NOT NULL, 
@@ -64,8 +82,8 @@ CREATE TABLE progress_topic_state (
 	FOREIGN KEY(topic_id) REFERENCES curriculum_topic (id)
 );
 
+CREATE INDEX ix_progress_topic_state_school_id ON progress_topic_state (school_id);
+
 CREATE INDEX ix_progress_topic_state_student_user_id ON progress_topic_state (student_user_id);
 
 CREATE INDEX ix_progress_topic_state_topic_id ON progress_topic_state (topic_id);
-
-CREATE INDEX ix_progress_topic_state_school_id ON progress_topic_state (school_id);

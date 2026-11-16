@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     grade_min: int = Field(default=1, alias="GRADE_MIN")
     grade_max: int = Field(default=9, alias="GRADE_MAX")
 
+    # Analyticke centrum: potlacenie skupin mensich nez prah (predvolene 5)
+    analytics_min_group_size: int = Field(default=5, alias="ANALYTICS_MIN_GROUP_SIZE")
+
     database_url: str = Field(..., alias="DATABASE_URL")
 
     jwt_secret_key: str = Field(..., alias="JWT_SECRET_KEY")
