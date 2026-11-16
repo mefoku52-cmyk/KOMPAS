@@ -32,9 +32,9 @@ CREATE TABLE curriculum_subject_workspace (
 
 CREATE INDEX ix_curriculum_subject_workspace_subject_id ON curriculum_subject_workspace (subject_id);
 
-CREATE INDEX ix_curriculum_subject_workspace_school_id ON curriculum_subject_workspace (school_id);
-
 CREATE INDEX ix_curriculum_subject_workspace_teacher_user_id ON curriculum_subject_workspace (teacher_user_id);
+
+CREATE INDEX ix_curriculum_subject_workspace_school_id ON curriculum_subject_workspace (school_id);
 
 CREATE TABLE curriculum_topic (
 	id UUID NOT NULL, 
