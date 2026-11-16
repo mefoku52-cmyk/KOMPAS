@@ -38,6 +38,7 @@ import app.modules.k08_work_assistant.domain.models  # noqa: F401,E402
 import app.modules.k10_organization_center.domain.models  # noqa: F401,E402
 import app.modules.k11_operations_center.domain.models  # noqa: F401,E402
 import app.modules.k12_analytics_center.domain.models  # noqa: F401,E402
+import app.modules.k14_communication_center.domain.models  # noqa: F401,E402
 
 
 @pytest.fixture()
