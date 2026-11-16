@@ -1,3 +1,26 @@
+CREATE TABLE progress_adaptive_recommendation (
+	id UUID NOT NULL, 
+	school_id UUID NOT NULL, 
+	student_user_id UUID NOT NULL, 
+	topic_id UUID NOT NULL, 
+	reason TEXT NOT NULL, 
+	suggested_action VARCHAR(64) NOT NULL, 
+	valid_from TIMESTAMP WITH TIME ZONE NOT NULL, 
+	valid_to TIMESTAMP WITH TIME ZONE, 
+	version INTEGER NOT NULL, 
+	is_demo BOOLEAN NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(school_id) REFERENCES school_school (id), 
+	FOREIGN KEY(student_user_id) REFERENCES identity_user (id), 
+	FOREIGN KEY(topic_id) REFERENCES curriculum_topic (id)
+);
+
+CREATE INDEX ix_progress_adaptive_recommendation_topic_id ON progress_adaptive_recommendation (topic_id);
+
+CREATE INDEX ix_progress_adaptive_recommendation_student_user_id ON progress_adaptive_recommendation (student_user_id);
+
+CREATE INDEX ix_progress_adaptive_recommendation_school_id ON progress_adaptive_recommendation (school_id);
+
 CREATE TABLE progress_student_profile (
 	id UUID NOT NULL, 
 	school_id UUID NOT NULL, 

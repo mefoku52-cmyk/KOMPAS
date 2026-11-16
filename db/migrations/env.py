@@ -33,6 +33,7 @@ import app.modules.k01_learning_profile.domain.models  # noqa: F401,E402
 import app.modules.k02_subject_workspace.domain.models  # noqa: F401,E402
 import app.modules.k05_knowledge_continuity.domain.models  # noqa: F401,E402
 import app.modules.k04_missions.domain.models  # noqa: F401,E402
+import app.modules.k03_adaptive_learning.domain.models  # noqa: F401,E402
 
 config = context.config
 if config.config_file_name is not None:
