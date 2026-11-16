@@ -28,6 +28,6 @@ CREATE TABLE audit_log (
 	UNIQUE (record_hash)
 );
 
-CREATE INDEX ix_audit_log_school_id ON audit_log (school_id);
-
 CREATE INDEX ix_audit_log_principal_id ON audit_log (principal_id);
+
+CREATE INDEX ix_audit_log_school_id ON audit_log (school_id);
