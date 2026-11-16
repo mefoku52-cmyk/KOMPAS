@@ -1,38 +1,46 @@
 # KOMPAS
 
-Inteligentny partner skoly pre ziaka, ucitela, vedenie skoly a rodica. Projekt je v aktivnom vyvoji (modularny monolit: backend FastAPI + SQLAlchemy, frontend planovany).
+Inteligentný partner školy pre žiaka, učiteľa, vedenie školy a rodiča (modulárny monolit: backend FastAPI + SQLAlchemy, frontend Next.js).
+
+Demonštračné údaje v tomto repozitári sú ilustračné a musia byť označené `is_demo = true` (pozri `scripts/seed_demo.py`). Otvorené rozhodnutia a stav sú v `docs/REPORT_FAZA_7.md`.
 
 ## Predpoklady
 
-- Python 3.14+ (overene v prostredi projektu)
-- Virtualne prostredie backendu: `backend/.venv`
-- Nastroj Node.js a npm (potrebne pre frontend, Faza 6)
+- Python 3.14+ a virtuálne prostredie `backend/.venv` (závislosti v `backend/requirements.txt`)
+- Node.js a npm (frontend; v Termux/Android overené s workaroundom v 6.9)
+- Git
 
 ## Nastavenie prostredia
 
-1. Vytvor lokalny `.env` s nahodnym tajomstvom (subor sa necommituje):
+1. Vytvor lokálny `.env` s náhodným tajomstvom (súbor sa necommituje):
 
 ```bash
 bash scripts/make_env.sh
 ```
 
-2. Skontroluj/aktivuj backend zavislosti vo virtualnom prostredi `backend/.venv` (verzie su pripnute v `backend/requirements.txt`).
+2. Pred príkazmi načítaj premenné (príklad):
+
+```bash
+set -a; . ./.env; set +a
+```
+
+Povinné premenné: `DATABASE_URL`, `JWT_SECRET_KEY` (HS256, bez predvolenej hodnoty). Voliteľné: `APP_PORT`, `GRADE_MIN`, `GRADE_MAX` (dočasné technické predvolené hodnoty), `ANALYTICS_MIN_GROUP_SIZE`.
 
 ## Spustenie backendu
+
+Jeden príkaz (načíta `.env` ak existuje, spustí uvicorn):
 
 ```bash
 bash scripts/run_dev.sh
 ```
 
-- Server bezi na porte `APP_PORT` (predvolene 8000).
-- Kontrola stavu: `GET /health`
-- Prihlasenie: `POST /auth/login`
+- Server: `http://0.0.0.0:${APP_PORT:-8000}`
+- Stav: `GET /health`
+- Prihlásenie: `POST /auth/login`
 
-Pred spustenim musia byt nastavene premenne prostredia (napr. cez `.env`): `DATABASE_URL`, `JWT_SECRET_KEY` (HS256, bez predvolenej hodnoty).
+## Migrácie (Alembic)
 
-## Migracie (Alembic)
-
-Migracie su v `db/migrations`, konfiguracia v `backend/alembic.ini`.
+Migrácie: `db/migrations` (konfigurácia `backend/alembic.ini`).
 
 ```bash
 cd backend
@@ -41,11 +49,11 @@ export PYTHONPATH=.
 ../backend/.venv/bin/python -m alembic upgrade head
 ```
 
-Iné operacie: `alembic downgrade base`, opätovný `alembic upgrade head`.
+Cyklus kontroly: `alembic upgrade head`, `alembic downgrade base`, `alembic upgrade head` (na čistej databáze).
 
-## Generovanie schemy
+## Generovanie schémy
 
-Subory `db/schema/*.sql` su generovane exporty DDL pre PostgreSQL (D2):
+`db/schema/*.sql` sú generované exporty DDL pre PostgreSQL (D2), podľa prefixov oblastí (D3):
 
 ```bash
 PYTHONPATH=backend backend/.venv/bin/python scripts/export_schema.py
@@ -53,28 +61,58 @@ PYTHONPATH=backend backend/.venv/bin/python scripts/export_schema.py
 
 ## Testy
 
-Backend a integracne testy (zo korena repozitara, s načítanym `.env`):
+Backend a integračné testy (z koreňa repozitára, s `.env`):
 
 ```bash
 set -a; . ./.env; set +a
-PYTHONPATH=backend backend/.venv/bin/python -m pytest -q backend
+PYTHONPATH=backend backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend
 ```
 
-Kontrolny skript fazy:
+Kontrola fázy:
 
 ```bash
-bash scripts/check_phase.sh <cislo_fazy>
+bash scripts/check_phase.sh <0-7>
 ```
 
 ## Frontend
 
-Frontend (Next.js) bude doplneny vo Faze 6. Preklady: zdroj pravdy `locales/`, synchronizacia do `frontend/src/locales` skriptom `scripts/sync_locales.sh` (bude doplnene).
+Next.js (TypeScript, App Router) v `frontend/`. Preklady: zdroj pravdy `locales/` (sk predvolené, en), synchronizácia:
 
-## Demonštračné dáta
+```bash
+bash scripts/sync_locales.sh
+```
 
-Skript `scripts/seed_demo.py` bude doplneny v neskoršej faze. Demonštračné dáta musia byt oznacene `is_demo = true`.
+Vývoj:
 
-## Dokumentacia
+```bash
+cd frontend
+npm run dev
+```
 
-- Zakladny stav prostredia a rozhodnutia: `docs/BASELINE.md`
-- Architektonicke rozhodnutia (ADR): `docs/adr/`
+Zostavenie (produkčný build):
+
+```bash
+cd frontend
+npm run build
+```
+
+Poznámka k prostrediu: v Termux/Android bol build funkčný s úpravou z kroku 6.9 (Next 13.5.x, Babel fallback `.babelrc`, `swcMinify: false`, build cez `node node_modules/next/dist/bin/next build`), pretože natívny SWC pre `android-arm64` nebol dostupný. e2e testy (Playwright) v tomto prostredí neboli spustiteľné (chýbajú browser binárky); detail a alternatívy sú v `docs/REPORT_FAZA_7.md`.
+
+## Demonštračné dáta (seed)
+
+Skript vytvára ilustračné dáta označené `is_demo = true` (bez skutočných osôb):
+
+```bash
+set -a; . ./.env; set +a
+PYTHONPATH=backend backend/.venv/bin/python scripts/seed_demo.py
+```
+
+## Dokumentácia
+
+- Záverečný report a otvorené rozhodnutia: `docs/REPORT_FAZA_7.md`
+- Základný stav a rozhodnutia: `docs/BASELINE.md`, `docs/adr/`
+- Moduly: `docs/modules/K-01.md` až `K-16.md`
+- API kontrakty (generované): `docs/api-contracts/README.md`, `docs/api-contracts/openapi.json`
+- Udalosti (generované): `docs/events/README.md`
+- Oprávnenia a matica: `docs/permissions/README.md`
+- Dátový model (generované): `docs/data-model/README.md`
