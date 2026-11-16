@@ -28,7 +28,9 @@ def create_app() -> FastAPI:
 
     from app.modules.k08_work_assistant import register as register_k08
 
-    module_registrars = [register_k16, register_k01, register_k02, register_k05, register_k04, register_k03, register_k09, register_k07, register_k08]
+    from app.modules.k10_organization_center import register as register_k10
+
+    module_registrars = [register_k16, register_k01, register_k02, register_k05, register_k04, register_k03, register_k09, register_k07, register_k08, register_k10]
     for registrar in module_registrars:
         registrar(app, bus)
 
