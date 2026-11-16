@@ -10,3 +10,5 @@
 | 5 | - | hotové | 516722a | 2026-11-16 | Moduly skupina C (etapa 1, schválené) |
 | 6 | - | hotové | 516722a | 2026-11-16 | Frontend (etapa 1, schválené) |
 | 7 | - | hotové | 516722a | 2026-11-16 | Integrácia, dokumentácia a záver (etapa 1, schválené) |
+| 8 | 8.1 | hotové | 72e280a | 2026-11-16 | Vytvorený PROGRES.md, FÁZY 0–7 označené ako hotové |
+| 8 | 8.2 | hotové |  | 2026-11-16 | Inventár 341 súborov do PRODUKCIA_AUDIT.md |
