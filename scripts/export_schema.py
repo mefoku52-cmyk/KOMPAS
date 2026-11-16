@@ -54,15 +54,19 @@ def main() -> int:
     out_dir = ROOT / "db" / "schema"
     out_dir.mkdir(parents=True, exist_ok=True)
     statements: dict[str, list[str]] = {k: [] for k in AREA_PREFIXES}
+    seen_sql: dict[str, set[str]] = {k: set() for k in AREA_PREFIXES}
 
     def dump(sql, *multiparams, **params):
         compiled = sql.compile(dialect=engine.dialect)
-        text = str(compiled).strip()
-        if not text:
+        text_sql = str(compiled).strip()
+        if not text_sql:
             return
-        if not text.endswith(";"):
-            text += ";"
-        statements[current_area].append(text)
+        if not text_sql.endswith(";"):
+            text_sql += ";"
+        if text_sql in seen_sql[current_area]:
+            return
+        seen_sql[current_area].add(text_sql)
+        statements[current_area].append(text_sql)
 
     engine = create_mock_engine("postgresql://", dump)
     tables = sorted(Base.metadata.tables.values(), key=lambda t: t.name)

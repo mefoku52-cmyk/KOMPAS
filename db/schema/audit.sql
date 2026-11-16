@@ -11,10 +11,6 @@ CREATE INDEX ix_audit_event_log_event_type ON audit_event_log (event_type);
 
 CREATE INDEX ix_audit_event_log_school_id ON audit_event_log (school_id);
 
-CREATE INDEX ix_audit_event_log_event_type ON audit_event_log (event_type);
-
-CREATE INDEX ix_audit_event_log_school_id ON audit_event_log (school_id);
-
 CREATE TABLE audit_log (
 	id UUID NOT NULL, 
 	timestamp TIMESTAMP WITH TIME ZONE NOT NULL, 
@@ -32,10 +28,6 @@ CREATE TABLE audit_log (
 	UNIQUE (record_hash)
 );
 
-CREATE INDEX ix_audit_log_principal_id ON audit_log (principal_id);
-
 CREATE INDEX ix_audit_log_school_id ON audit_log (school_id);
 
 CREATE INDEX ix_audit_log_principal_id ON audit_log (principal_id);
-
-CREATE INDEX ix_audit_log_school_id ON audit_log (school_id);
