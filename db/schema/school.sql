@@ -18,6 +18,28 @@ CREATE INDEX ix_school_class_group_school_year_id ON school_class_group (school_
 
 CREATE INDEX ix_school_class_group_school_id ON school_class_group (school_id);
 
+CREATE TABLE school_class_teacher (
+	id UUID NOT NULL, 
+	school_id UUID NOT NULL, 
+	class_group_id UUID NOT NULL, 
+	teacher_user_id UUID NOT NULL, 
+	valid_from TIMESTAMP WITH TIME ZONE NOT NULL, 
+	valid_to TIMESTAMP WITH TIME ZONE, 
+	version INTEGER NOT NULL, 
+	is_demo BOOLEAN NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uq_school_class_teacher UNIQUE (school_id, class_group_id, teacher_user_id), 
+	FOREIGN KEY(school_id) REFERENCES school_school (id), 
+	FOREIGN KEY(class_group_id) REFERENCES school_class_group (id), 
+	FOREIGN KEY(teacher_user_id) REFERENCES identity_user (id)
+);
+
+CREATE INDEX ix_school_class_teacher_teacher_user_id ON school_class_teacher (teacher_user_id);
+
+CREATE INDEX ix_school_class_teacher_school_id ON school_class_teacher (school_id);
+
+CREATE INDEX ix_school_class_teacher_class_group_id ON school_class_teacher (class_group_id);
+
 CREATE TABLE school_enrollment (
 	id UUID NOT NULL, 
 	school_id UUID NOT NULL, 
