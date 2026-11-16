@@ -24,6 +24,7 @@ import app.shared.curriculum  # noqa: F401,E402
 import app.modules.k16_intelligent_core.domain.models  # noqa: F401,E402
 import app.modules.k01_learning_profile.domain.models  # noqa: F401,E402
 import app.modules.k02_subject_workspace.domain.models  # noqa: F401,E402
+import app.modules.k05_knowledge_continuity.domain.models  # noqa: F401,E402
 
 AREA_PREFIXES = {
     "identity": "identity_",
