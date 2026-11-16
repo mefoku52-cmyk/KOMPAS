@@ -1,10 +1,11 @@
 import uuid
+from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy import insert
 
+from app.core.database.session import Base
 from app.modules.k03_adaptive_learning.services.service import K03Service
-from app.modules.k05_knowledge_continuity.domain.models import TopicProgressKind, TopicProgressStatus
-from app.modules.k05_knowledge_continuity.services.service import K05Service
 from app.shared.curriculum import Subject, Topic
 from app.shared.identity import User
 from app.shared.school import ClassGroup, Enrollment, School, SchoolYear
@@ -40,19 +41,32 @@ def _setup(db_session):
     return dict(school_id=school_id, student_id=student_id, teacher_id=teacher_id, class_id=class_id, t1=t1, t2=t2, t3=t3)
 
 
+def _insert_topic_state(db_session, *, school_id, student_id, topic_id, kind, status, evidence_attempt_ref, is_verification_evidence, ts):
+    table = Base.metadata.tables["progress_topic_state"]
+    db_session.execute(
+        insert(table).values(
+            id=uuid.uuid4(),
+            school_id=school_id,
+            student_user_id=student_id,
+            topic_id=topic_id,
+            kind=kind,
+            status=status,
+            evidence_attempt_ref=evidence_attempt_ref,
+            is_verification_evidence=is_verification_evidence,
+            valid_from=ts,
+            valid_to=None,
+            version=1,
+            is_demo=False,
+        )
+    )
+
+
 def test_k03_deterministic_explainable_recommendations(db_session):
     ctx = _setup(db_session)
-    sp = _sys(ctx["school_id"])
-    k05 = K05Service(db_session)
-    # in progress -> recommend
-    k05.record_state(sp, school_id=ctx["school_id"], student_user_id=ctx["student_id"], topic_id=ctx["t1"],
-                     kind=TopicProgressKind.PRACTICED, status=TopicProgressStatus.IN_PROGRESS_PRACTICE, evidence_attempt_ref="a1")
-    # partially mastered -> recommend
-    k05.record_state(sp, school_id=ctx["school_id"], student_user_id=ctx["student_id"], topic_id=ctx["t2"],
-                     kind=TopicProgressKind.COVERED, status=TopicProgressStatus.PARTIALLY_MASTERED, evidence_attempt_ref="c1")
-    # verified mastery -> no recommendation
-    k05.record_state(sp, school_id=ctx["school_id"], student_user_id=ctx["student_id"], topic_id=ctx["t3"],
-                     kind=TopicProgressKind.VERIFIED, status=TopicProgressStatus.VERIFIED_MASTERY, evidence_attempt_ref="v1", is_verification_evidence=True)
+    ts = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _insert_topic_state(db_session, school_id=ctx["school_id"], student_id=ctx["student_id"], topic_id=ctx["t1"], kind="practiced", status="in_progress_practice", evidence_attempt_ref="a1", is_verification_evidence=False, ts=ts)
+    _insert_topic_state(db_session, school_id=ctx["school_id"], student_id=ctx["student_id"], topic_id=ctx["t2"], kind="covered", status="partially_mastered", evidence_attempt_ref="c1", is_verification_evidence=False, ts=ts)
+    _insert_topic_state(db_session, school_id=ctx["school_id"], student_id=ctx["student_id"], topic_id=ctx["t3"], kind="verified", status="verified_mastery", evidence_attempt_ref="v1", is_verification_evidence=True, ts=ts)
     db_session.commit()
 
     svc = K03Service(db_session)
@@ -67,10 +81,8 @@ def test_k03_deterministic_explainable_recommendations(db_session):
 
 def test_k03_permissions(db_session):
     ctx = _setup(db_session)
-    sp = _sys(ctx["school_id"])
-    k05 = K05Service(db_session)
-    k05.record_state(sp, school_id=ctx["school_id"], student_user_id=ctx["student_id"], topic_id=ctx["t1"],
-                     kind=TopicProgressKind.PRACTICED, status=TopicProgressStatus.IN_PROGRESS_PRACTICE, evidence_attempt_ref="a1")
+    ts = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _insert_topic_state(db_session, school_id=ctx["school_id"], student_id=ctx["student_id"], topic_id=ctx["t1"], kind="practiced", status="in_progress_practice", evidence_attempt_ref="a1", is_verification_evidence=False, ts=ts)
     db_session.commit()
     svc = K03Service(db_session)
     teacher = Principal(user_id=ctx["teacher_id"], role=Role.TEACHER, school_id=ctx["school_id"])

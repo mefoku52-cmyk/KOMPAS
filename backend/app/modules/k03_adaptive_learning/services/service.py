@@ -7,9 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit.logger import write as audit_write
+from app.core.database.session import Base
 from app.core.permissions.policy import Scope, authorize
 from app.modules.k03_adaptive_learning.repository.repository import K03Repository
-from app.modules.k05_knowledge_continuity.domain.models import TopicState, TopicProgressStatus
 from app.shared.types import Principal, Role
 
 
@@ -39,28 +39,46 @@ class K03Service:
             return {"scope": Scope.SCHOOL_INDIVIDUAL_WITH_PURPOSE.value, "school_id": school_id, "student_user_id": student_user_id, "purpose": purpose}
         return {"school_id": school_id}
 
+    def _status_value(self, value: Any) -> str:
+        return getattr(value, "value", value)
+
     def recommend_for_student(self, principal: Principal, *, school_id: uuid.UUID, student_user_id: uuid.UUID, purpose: str | None = None, class_group_id: uuid.UUID | None = None, teaches: bool = False, persist: bool = False, is_demo: bool = False):
         action = "k03.recommend"
         resource = f"progress_adaptive_recommendation:student:{student_user_id}"
         ctx = self._view_context(principal, student_user_id=student_user_id, school_id=school_id, purpose=purpose, class_group_id=class_group_id, teaches=teaches)
         self._authorize_or_raise(principal, action, resource, ctx, purpose=purpose)
 
-        # deterministic: latest status per topic
-        stmt = select(TopicState).where(TopicState.student_user_id == student_user_id, TopicState.school_id == school_id).order_by(TopicState.topic_id.asc(), TopicState.valid_from.desc(), TopicState.version.desc())
-        rows = list(self.db.execute(stmt).scalars().all())
-        latest_by_topic: dict[uuid.UUID, TopicState] = {}
-        for r in rows:
-            if r.topic_id not in latest_by_topic:
-                latest_by_topic[r.topic_id] = r
+        topic_state_table = Base.metadata.tables.get("progress_topic_state")
+        latest_by_topic: dict[uuid.UUID, dict[str, Any]] = {}
+        if topic_state_table is not None:
+            stmt = (
+                select(
+                    topic_state_table.c.topic_id,
+                    topic_state_table.c.status,
+                    topic_state_table.c.evidence_attempt_ref,
+                    topic_state_table.c.valid_from,
+                    topic_state_table.c.version,
+                )
+                .where(topic_state_table.c.student_user_id == student_user_id, topic_state_table.c.school_id == school_id)
+                .order_by(topic_state_table.c.topic_id.asc(), topic_state_table.c.valid_from.desc(), topic_state_table.c.version.desc())
+            )
+            for row in self.db.execute(stmt).all():
+                if row.topic_id not in latest_by_topic:
+                    latest_by_topic[row.topic_id] = {
+                        "status": self._status_value(row.status),
+                        "evidence_attempt_ref": row.evidence_attempt_ref,
+                    }
 
         suggestions: list[dict[str, Any]] = []
         for topic_id, st in latest_by_topic.items():
-            if st.status == TopicProgressStatus.VERIFIED_MASTERY.value:
-                continue  # nothing to recommend
-            if st.status == TopicProgressStatus.IN_PROGRESS_PRACTICE.value:
-                reason = f"Deterministic: tema ma stav {st.status} na zaklade dokladu {st.evidence_attempt_ref or 'bez odkazu'}; odporuca sa pokracovat v precvicovani."
-            else:  # PARTIALLY_MASTERED
-                reason = f"Deterministic: tema ma stav {st.status} (ciastocne zvladnute) na zaklade dokladu {st.evidence_attempt_ref or 'bez odkazu'}; odporuca sa cielene precvicovanie pred overenim."
+            status = st["status"]
+            if status == "verified_mastery":
+                continue
+            evidence = st.get("evidence_attempt_ref") or "bez odkazu"
+            if status == "in_progress_practice":
+                reason = f"Deterministic: tema ma stav {status} na zaklade dokladu {evidence}; odporuca sa pokracovat v precvicovani."
+            else:
+                reason = f"Deterministic: tema ma stav {status} (ciastocne zvladnute) na zaklade dokladu {evidence}; odporuca sa cielene precvicovanie pred overenim."
             suggestions.append({"topic_id": str(topic_id), "reason": reason, "suggested_action": "practice"})
             if persist:
                 self.repo.add_recommendation(
