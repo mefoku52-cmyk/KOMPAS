@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import "./globals.css";
+import sk from "@/locales/sk/common.json";
 
 export const metadata = {
-  title: "KOMPAS",
-  description: "KOMPAS",
+  title: sk.app.title,
+  description: sk.app.title,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
