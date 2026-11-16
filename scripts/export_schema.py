@@ -30,6 +30,7 @@ import app.modules.k03_adaptive_learning.domain.models  # noqa: F401,E402
 import app.modules.k09_class_overview.domain.models  # noqa: F401,E402
 import app.modules.k07_professional_library.domain.models  # noqa: F401,E402
 import app.modules.k08_work_assistant.domain.models  # noqa: F401,E402
+import app.modules.k10_organization_center.domain.models  # noqa: F401,E402
 
 AREA_PREFIXES = {
     "identity": "identity_",
