@@ -76,7 +76,10 @@ def main() -> int:
 
     for area, stmts in statements.items():
         path = out_dir / f"{area}.sql"
-        content = "\n\n".join(stmts) + ("\n" if stmts else "")
+        if stmts:
+            content = "\n\n".join(stmts) + "\n"
+        else:
+            content = f"-- Generated PostgreSQL DDL for area: {area}\n-- No tables defined yet.\n"
         path.write_text(content, encoding="utf-8")
         print(f"wrote {path} ({len(stmts)} statements)")
 

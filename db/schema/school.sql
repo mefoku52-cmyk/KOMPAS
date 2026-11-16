@@ -40,13 +40,13 @@ CREATE TABLE school_enrollment (
 	FOREIGN KEY(student_user_id) REFERENCES identity_user (id)
 );
 
-CREATE INDEX ix_school_enrollment_student_user_id ON school_enrollment (student_user_id);
+CREATE INDEX ix_school_enrollment_school_id ON school_enrollment (school_id);
 
 CREATE INDEX ix_school_enrollment_class_group_id ON school_enrollment (class_group_id);
 
 CREATE INDEX ix_school_enrollment_school_year_id ON school_enrollment (school_year_id);
 
-CREATE INDEX ix_school_enrollment_school_id ON school_enrollment (school_id);
+CREATE INDEX ix_school_enrollment_student_user_id ON school_enrollment (student_user_id);
 
 CREATE INDEX ix_school_enrollment_class_group_id ON school_enrollment (class_group_id);
 

@@ -1,0 +1,2 @@
+-- Generated PostgreSQL DDL for area: ai_knowledge
+-- No tables defined yet.

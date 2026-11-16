@@ -49,18 +49,18 @@ def test_table_naming_convention_d3_and_schema_files():
     areas_seen = set()
     for t in tables:
         areas_seen.add(table_area(t))
-    # every known prefix used? not required, but all 10 schema files must exist and be covered
+    assert areas_seen
     schema_dir = ROOT / "db" / "schema"
     for area in AREA_PREFIXES:
         p = schema_dir / f"{area}.sql"
         assert p.exists(), f"missing schema file for {area}"
-        # file must belong to that area by prefix in content when non-empty
         content = p.read_text(encoding="utf-8")
-        if content.strip():
-            # basic check: contains CREATE TABLE <prefix or mapped>
-            assert f"CREATE TABLE" in content
-    # all 10 covered as files
-    assert set(AREA_PREFIXES.keys()) == {p.stem for p in schema_dir.glob('*.sql')}
+        assert content.strip(), f"schema file must be non-empty: {p}"
+        if "No tables defined yet" in content:
+            assert f"area: {area}" in content
+        else:
+            assert "CREATE TABLE" in content
+    assert set(AREA_PREFIXES.keys()) == {p.stem for p in schema_dir.glob("*.sql")}
 
 
 def test_no_cross_module_internal_imports():

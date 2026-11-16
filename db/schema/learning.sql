@@ -1,0 +1,2 @@
+-- Generated PostgreSQL DDL for area: learning
+-- No tables defined yet.

@@ -1,0 +1,2 @@
+-- Generated PostgreSQL DDL for area: communication
+-- No tables defined yet.

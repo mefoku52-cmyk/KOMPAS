@@ -1,0 +1,2 @@
+-- Generated PostgreSQL DDL for area: teacher_workspace
+-- No tables defined yet.

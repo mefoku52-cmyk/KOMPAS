@@ -1,0 +1,2 @@
+-- Generated PostgreSQL DDL for area: progress
+-- No tables defined yet.

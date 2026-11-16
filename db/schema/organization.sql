@@ -1,0 +1,2 @@
+-- Generated PostgreSQL DDL for area: organization
+-- No tables defined yet.
