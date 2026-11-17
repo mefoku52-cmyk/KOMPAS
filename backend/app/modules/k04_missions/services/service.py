@@ -89,3 +89,42 @@ class K04Service:
         )
         self.bus.publish(event, db=self.db)
         return attempt
+
+    def create_task(self, principal: Principal, *, mission_id: uuid.UUID, task_type: str, prompt: str, expected_answer: str, order_index: int = 0, is_demo: bool = False):
+        action = "k04.create_task"
+        mission = self.repo.get_mission(mission_id)
+        if not mission:
+            raise ValueError("mission_not_found")
+        if principal.is_system:
+            ctx = {"school_id": mission.school_id, "system_internal": True}
+        elif principal.role == Role.LEADERSHIP:
+            purpose = "manage_learning_content"
+            ctx = {"scope": Scope.SCHOOL_INDIVIDUAL_WITH_PURPOSE.value, "school_id": mission.school_id, "purpose": purpose}
+        else:
+            ctx = {"school_id": mission.school_id}
+        self._authorize_or_raise(principal, action, f"learning_mission:{mission_id}", ctx)
+        obj = self.repo.create_task(school_id=mission.school_id, mission_id=mission_id, task_type=task_type, prompt=prompt, expected_answer=expected_answer, order_index=order_index, is_demo=is_demo)
+        audit_write(self.db, principal, action, f"learning_task:{obj.id}", None, "success")
+        return obj
+
+    def list_tasks(self, principal: Principal, mission_id: uuid.UUID):
+        action = "k04.list_tasks"
+        mission = self.repo.get_mission(mission_id)
+        if not mission:
+            raise ValueError("mission_not_found")
+        if principal.is_system:
+            ctx = {"school_id": mission.school_id, "system_internal": True}
+        elif principal.role == Role.TEACHER:
+            ctx = {"scope": Scope.TEACHES_CLASS.value, "school_id": mission.school_id, "student_user_id": None, "class_group_id": None, "teacher_user_id": principal.user_id, "teaches": True}
+        elif principal.role == Role.LEADERSHIP:
+            ctx = {"scope": Scope.SCHOOL_INDIVIDUAL_WITH_PURPOSE.value, "school_id": mission.school_id, "purpose": "manage_learning_content"}
+        elif principal.role == Role.STUDENT and principal.school_id == mission.school_id:
+            rows = self.repo.list_tasks(mission_id)
+            audit_write(self.db, principal, action, f"learning_mission:{mission_id}", None, "success", {"count": len(rows)})
+            return rows
+        else:
+            ctx = {"school_id": mission.school_id}
+        self._authorize_or_raise(principal, action, f"learning_mission:{mission_id}", ctx)
+        rows = self.repo.list_tasks(mission_id)
+        audit_write(self.db, principal, action, f"learning_mission:{mission_id}", None, "success", {"count": len(rows)})
+        return rows

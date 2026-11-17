@@ -60,3 +60,17 @@ class K10Service:
         rows = self.repo.list_tasks(school_id)
         audit_write(self.db, principal, action, f"organization_task:school:{school_id}", None, "success", {"count": len(rows)})
         return rows
+
+    def list_plans(self, principal: Principal, school_id: uuid.UUID):
+        action = "k10.list_plans"
+        self._auth(principal, action, f"organization_plan:school:{school_id}", school_id)
+        rows = self.repo.list_plans(school_id)
+        audit_write(self.db, principal, action, f"organization_plan:school:{school_id}", None, "success", {"count": len(rows)})
+        return rows
+
+    def list_assignments(self, principal: Principal, task_id: uuid.UUID, school_id: uuid.UUID):
+        action = "k10.list_assignments"
+        self._auth(principal, action, f"organization_task:{task_id}", school_id)
+        rows = self.repo.list_assignments_for_task(task_id)
+        audit_write(self.db, principal, action, f"organization_task:{task_id}", None, "success", {"count": len(rows)})
+        return rows

@@ -88,3 +88,10 @@ class K15Service:
         rows = self.repo.list_submissions(task_id)
         audit_write(self.db, principal, action, resource, None, "success", {"count": len(rows)})
         return rows
+
+    def get_project(self, principal: Principal, *, project_id: uuid.UUID):
+        action = "k15.get_project"
+        resource = f"organization_project:{project_id}"
+        project = self._require_project_member(principal, project_id, action, resource)
+        audit_write(self.db, principal, action, resource, None, "success")
+        return project

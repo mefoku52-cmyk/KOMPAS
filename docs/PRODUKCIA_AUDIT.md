@@ -496,3 +496,25 @@ Porovnanie so sekciou 7 `docs/OPENCODE_PROMPT.md` a `docs/modules/K-XX.md`. Stav
 | Endpointy (OpenAPI) | žiadne (okrem prípadného neexportovaného) |
 | Testy | `backend/app/modules/k06_virtual_lab/tests/test_service.py` |
 
+## 8.7 Medzery podľa priority
+
+### Blokuje produkciu
+- Doménové HTTP endpointy pre K-01 až K-16: väčšina routerov vystavuje iba `/status` alebo je prázdna; frontend preto volá iba `/auth/login`. Dopĺňa FÁZA 9.1.
+- Jednotný formát chýb s kódom, kľúčom pre i18n a `request_id` chýba. Dopĺňa FÁZA 9.2.
+- Stránkovanie, filtrovanie a horné limity zoznamov chýbajú. Dopĺňa FÁZA 9.3.
+- Rate limiting a prísnejší limit na prihlásenie chýba. Dopĺňa FÁZA 9.4.
+- Autentifikácia nemá zmenu hesla, politiku hesiel, zamknutie po neúspechoch, odhlásenie ani zneplatnenie tokenov. Dopĺňa FÁZA 9.5.
+- Chýba správa škôl a používateľov cez CLI (`scripts/manage.py`). Dopĺňa FÁZA 9.6.
+- Chýba prechod školského roka a export údajov žiaka. Dopĺňa FÁZA 9.7 a 9.8.
+- `backend/app/shared/storage.py` má bázové metódy ukončené `raise NotImplementedError`; majú byť abstraktné alebo implementované. Dopĺňa FÁZA 9.1.
+- `scripts/check_prod.sh` obsahuje vo vlastnom zdrojovom kóde reťazec `TODO/FIXME` ako súčasť kontrolného regulárneho výrazu, čím sa kontrolný skript sám falošne označí. FÁZA 9.10 tento falošný nález odstráni bez zmeny významu kontroly.
+
+### Dôležité
+- Status endpointy nie sú chránené autentifikáciou. Dopĺňa FÁZA 9.1.
+- K-08 tvorí iba šablónový koncept a K-16 má NullProvider; externí poskytovatelia nie sú implementovaní podľa P6. Overenie patrí do FÁZY 9.9.
+- Audit verify nie je vystavený cez HTTP; operatívne overenie chýba. Dopĺňa FÁZA 9.8/9.6 (export auditu).
+
+### Neskôr
+- Frontend dátové napojenie na nové endpointy, dizajnový systém a dlaždice. Patrí do FÁZY 12 a 13.
+- PostgreSQL, zálohy, indexy a Redis. Patrí do FÁZY 10.
+- Bezpečnostné hlavičky, CORS, JWT rotácia a httpOnly cookie. Patrí do FÁZY 11.

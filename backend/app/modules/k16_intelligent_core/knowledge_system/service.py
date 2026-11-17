@@ -7,9 +7,9 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.core.audit.logger import write as audit_write
-from app.core.permissions.policy import authorize
+from app.core.permissions.policy import Scope, authorize
 from app.modules.k16_intelligent_core.repository.repository import K16Repository
-from app.shared.types import Principal
+from app.shared.types import Principal, Role
 
 
 class KnowledgeIndex:
@@ -44,7 +44,10 @@ class KnowledgeSystemService:
         content: str,
         approved: bool = False,
     ):
-        decision = authorize(principal, "ai.register_source", "ai_knowledge_source", context={"school_id": school_id, "system_internal": principal.is_system})
+        context = {"school_id": school_id, "system_internal": principal.is_system}
+        if principal.role == Role.LEADERSHIP and principal.school_id == school_id:
+            context = {"scope": Scope.SCHOOL_AGGREGATE.value, "school_id": school_id}
+        decision = authorize(principal, "ai.register_source", "ai_knowledge_source", context=context)
         if not decision.allowed:
             audit_write(self.db, principal, "ai.register_source", f"school:{school_id}", None, "denied", {"reason": decision.reason})
             raise PermissionError(decision.reason)
@@ -53,7 +56,10 @@ class KnowledgeSystemService:
         return obj
 
     def search_approved(self, principal: Principal, school_id: uuid.UUID, query: str):
-        decision = authorize(principal, "ai.search_knowledge", "ai_knowledge_source", context={"school_id": school_id, "system_internal": principal.is_system})
+        context = {"school_id": school_id, "system_internal": principal.is_system}
+        if principal.role == Role.LEADERSHIP and principal.school_id == school_id:
+            context = {"scope": Scope.SCHOOL_AGGREGATE.value, "school_id": school_id}
+        decision = authorize(principal, "ai.search_knowledge", "ai_knowledge_source", context=context)
         if not decision.allowed:
             audit_write(self.db, principal, "ai.search_knowledge", f"school:{school_id}", None, "denied", {"reason": decision.reason})
             raise PermissionError(decision.reason)

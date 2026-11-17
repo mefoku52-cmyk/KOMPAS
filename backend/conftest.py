@@ -41,6 +41,9 @@ import app.modules.k12_analytics_center.domain.models  # noqa: F401,E402
 import app.modules.k14_communication_center.domain.models  # noqa: F401,E402
 import app.modules.k15_collaboration_projects.domain.models  # noqa: F401,E402
 import app.modules.k06_virtual_lab.domain.models  # noqa: F401,E402
+import app.modules.k09_class_overview.domain.models  # noqa: F401,E402
+import app.modules.k13_parent_center.domain.models  # noqa: F401,E402
+import app.modules.k16_intelligent_core.domain.models  # noqa: F401,E402
 
 
 @pytest.fixture()

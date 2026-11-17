@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit.logger import AuditLog
-from app.core.permissions.policy import authorize
-from app.shared.types import Principal
+from app.core.permissions.policy import Scope, authorize
+from app.shared.types import Principal, Role
 
 
 class AuditEngineService:
@@ -18,7 +18,10 @@ class AuditEngineService:
         self.db = db
 
     def list_entries(self, principal: Principal, school_id: Optional[Any] = None, limit: int = 100):
-        decision = authorize(principal, "audit.read", "audit_log", context={"school_id": school_id, "system_internal": principal.is_system})
+        context = {"school_id": school_id, "system_internal": principal.is_system}
+        if principal.role == Role.LEADERSHIP and principal.school_id == school_id:
+            context = {"scope": Scope.SCHOOL_AGGREGATE.value, "school_id": school_id}
+        decision = authorize(principal, "audit.read", "audit_log", context=context)
         if not decision.allowed:
             raise PermissionError(decision.reason)
         stmt = select(AuditLog).order_by(AuditLog.timestamp.desc()).limit(limit)
