@@ -21,3 +21,4 @@
 | 9 | 9.1 | hotové | 5da770f | 2026-11-17 | Doménové HTTP endpointy K-01..K-16, spoločné API utility, jednotné chyby, auth na statusoch |
 | 9 | 9.2 | hotové | 126be42 | 2026-11-17 | Testy jednotného formátu chýb, request_id a mapovania výnimiek |
 | 9 | 9.3 | hotové | ee458fa | 2026-11-17 | Stránkovanie, filtre a horné limity zoznamov overené testami |
+| 9 | 9.4 | hotové | 7c53cc0 | 2026-11-17 | In-memory rate limiter, prísnejší login limit a konfigurácia |
