@@ -43,6 +43,7 @@ def _seed_states(db_session, school_id, student_ids):
         topic_id = uuid.uuid4()
         db_session.add(Topic(id=topic_id, school_id=school_id, subject_id=subject_id, name=f"T-{topic_id}", grade=1, order_index=1))
         db_session.commit()
+        db_session.flush()
         db_session.execute(insert(table).values(
             id=uuid.uuid4(),
             school_id=school_id,

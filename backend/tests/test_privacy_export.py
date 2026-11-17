@@ -58,6 +58,7 @@ def test_student_export_roles_and_audit(privacy_api):
     teacher = _user(db, school.id, Role.TEACHER, "teacher")
     leadership = _user(db, school.id, Role.LEADERSHIP, "leader")
     foreign_leader = _user(db, other_school.id, Role.LEADERSHIP, "foreign")
+    db.flush()
     db.add(GuardianLink(guardian_user_id=parent.id, child_user_id=student.id, school_id=school.id, is_demo=True))
     db.add(Enrollment(
         school_id=school.id, school_year_id=year.id, class_group_id=class_group.id,

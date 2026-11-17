@@ -20,13 +20,17 @@ def _setup(db_session):
     teacher_b = uuid.uuid4()
     leader = uuid.uuid4()
     db_session.add(School(id=school_id, name=f"S-{school_id}"))
+    db_session.flush()
     db_session.add(SchoolYear(id=year_id, school_id=school_id, name="2026/27"))
     db_session.add(ClassGroup(id=class_a, school_id=school_id, school_year_id=year_id, name="5A", grade=5))
     db_session.add(ClassGroup(id=class_b, school_id=school_id, school_year_id=year_id, name="5B", grade=5))
+    db_session.flush()
     for uid, n in [(student_a, "sa"), (student_b, "sb"), (parent_a, "pa"), (teacher_a, "ta"), (teacher_b, "tb"), (leader, "l")]:
         db_session.add(User(id=uid, school_id=school_id, username=f"{n}-{uid}", full_name=n, password_hash="x"))
+    db_session.flush()
     db_session.add(Enrollment(school_id=school_id, school_year_id=year_id, class_group_id=class_a, student_user_id=student_a))
     db_session.add(Enrollment(school_id=school_id, school_year_id=year_id, class_group_id=class_b, student_user_id=student_b))
+    db_session.flush()
     db_session.add(GuardianLink(guardian_user_id=parent_a, child_user_id=student_a, school_id=school_id))
     db_session.commit()
     return {

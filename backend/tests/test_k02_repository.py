@@ -11,8 +11,10 @@ def test_k02_repository_workspace_and_nodes(db_session):
     teacher_id = uuid.uuid4()
     subject_id = uuid.uuid4()
     db_session.add(School(id=school_id, name="S"))
+    db_session.flush()
     db_session.add(User(id=teacher_id, school_id=school_id, username="t", full_name="T", password_hash="x"))
     db_session.add(Subject(id=subject_id, school_id=school_id, name="Math"))
+    db_session.flush()
     db_session.commit()
 
     repo = K02Repository(db_session)

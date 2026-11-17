@@ -38,12 +38,14 @@ def _setup(db_session):
     db_session.add(Enrollment(school_id=school_id, school_year_id=year_id, class_group_id=class_id, student_user_id=student_id))
 
     ct = Base.metadata.tables["school_class_teacher"]
+    db_session.flush()
     db_session.execute(insert(ct).values(id=uuid.uuid4(), school_id=school_id, class_group_id=class_id, teacher_user_id=teacher_id, valid_from=datetime.now(timezone.utc), valid_to=None, version=1, is_demo=False))
 
     db_session.commit()
 
     table = Base.metadata.tables["progress_topic_state"]
     ts = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    db_session.flush()
     db_session.execute(insert(table).values(id=uuid.uuid4(), school_id=school_id, student_user_id=student_id, topic_id=topic_id, kind="practiced", status="in_progress_practice", evidence_attempt_ref="a1", is_verification_evidence=False, valid_from=ts, valid_to=None, version=1, is_demo=False))
     db_session.commit()
     return dict(school_id=school_id, class_id=class_id, teacher_id=teacher_id, other_teacher=other_teacher, student_id=student_id, topic_id=topic_id)

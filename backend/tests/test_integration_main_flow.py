@@ -29,6 +29,7 @@ def _seed(db, *, students_n=5):
     sys_p = Principal(user_id=uuid.uuid4(), role=None, school_id=school_id, scopes=(), is_system=True)
 
     db.add(School(id=school_id, name=f"DemoSchool-{school_id}", is_demo=True))
+    db.flush()
     db.add(SchoolYear(id=year_id, school_id=school_id, name="2026/27", is_demo=True))
     db.add(ClassGroup(id=class_id, school_id=school_id, school_year_id=year_id, name="5A", grade=5, is_demo=True))
     db.add(User(id=teacher_id, school_id=school_id, username=f"teach-{teacher_id}", full_name="Demo Teacher", password_hash="x", is_demo=True))
@@ -36,6 +37,7 @@ def _seed(db, *, students_n=5):
     db.add(Subject(id=subject_id, school_id=school_id, name="Math", is_demo=True))
     db.add(Topic(id=topic_id, school_id=school_id, subject_id=subject_id, name="Zlomky", grade=5, order_index=1, is_demo=True))
 
+    db.flush()
     ct = Base.metadata.tables["school_class_teacher"]
     db.execute(insert(ct).values(
         id=uuid.uuid4(), school_id=school_id, class_group_id=class_id, teacher_user_id=teacher_id,

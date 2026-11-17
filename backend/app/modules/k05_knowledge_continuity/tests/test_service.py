@@ -24,6 +24,7 @@ def _setup(db_session):
     class_id = uuid.uuid4()
 
     db_session.add(School(id=school_id, name=f"S-{school_id}"))
+    db_session.flush()
     db_session.add(SchoolYear(id=year_id, school_id=school_id, name="2026/27"))
     db_session.add(User(id=student_id, school_id=school_id, username=f"st-{student_id}", full_name="S", password_hash="x"))
     db_session.add(User(id=teacher_id, school_id=school_id, username=f"t-{teacher_id}", full_name="T", password_hash="x"))
@@ -32,7 +33,9 @@ def _setup(db_session):
     db_session.add(Subject(id=subject_id, school_id=school_id, name="Math"))
     db_session.add(Topic(id=topic_id, school_id=school_id, subject_id=subject_id, name="Fractions", grade=5, order_index=1))
     db_session.add(ClassGroup(id=class_id, school_id=school_id, school_year_id=year_id, name="5A", grade=5))
+    db_session.flush()
     db_session.add(Enrollment(school_id=school_id, school_year_id=year_id, class_group_id=class_id, student_user_id=student_id))
+    db_session.flush()
     db_session.add(GuardianLink(guardian_user_id=parent_id, child_user_id=student_id, school_id=school_id))
     db_session.commit()
     return dict(school_id=school_id, topic_id=topic_id, student_id=student_id, teacher_id=teacher_id, parent_id=parent_id, leader_id=leader_id, class_id=class_id)

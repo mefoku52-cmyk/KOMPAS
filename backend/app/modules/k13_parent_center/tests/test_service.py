@@ -14,9 +14,11 @@ def _setup(db_session):
     child_id = uuid.uuid4()
     other_parent_id = uuid.uuid4()
     db_session.add(School(id=school_id, name=f"S-{school_id}"))
+    db_session.flush()
     db_session.add(User(id=parent_id, school_id=school_id, username=f"p-{parent_id}", full_name="P", password_hash="x"))
     db_session.add(User(id=child_id, school_id=school_id, username=f"c-{child_id}", full_name="C", password_hash="x"))
     db_session.add(User(id=other_parent_id, school_id=school_id, username=f"o-{other_parent_id}", full_name="O", password_hash="x"))
+    db_session.flush()
     db_session.add(GuardianLink(guardian_user_id=parent_id, child_user_id=child_id, school_id=school_id))
     db_session.commit()
     return school_id, parent_id, child_id, other_parent_id

@@ -24,15 +24,20 @@ def _seed(db) -> dict:
     ids = {role: uuid.uuid4() for role in ("student", "teacher", "leadership", "parent")}
 
     db.add(School(id=school_id, name=f"APISchool-{school_id}", is_demo=True))
+    db.flush()
     db.add(SchoolYear(id=year_id, school_id=school_id, name="2026/27", is_demo=True))
     db.add(ClassGroup(id=class_id, school_id=school_id, school_year_id=year_id, name="5A", grade=5, is_demo=True))
     db.add(Subject(id=subject_id, school_id=school_id, name=f"Matematika-{subject_id}", is_demo=True))
     db.add(Topic(id=topic_id, school_id=school_id, subject_id=subject_id, name="Zlomky", grade=5, order_index=1, is_demo=True))
+    db.flush()
     for role, user_id in ids.items():
         db.add(User(id=user_id, school_id=school_id, username=f"api-{role}-{user_id}", full_name=f"Demo {role}", password_hash="x", is_demo=True))
         db.add(RoleAssignment(id=uuid.uuid4(), user_id=user_id, school_id=school_id, role=getattr(Role, role.upper()).value, is_demo=True))
+    db.flush()
     db.add(Enrollment(id=uuid.uuid4(), school_id=school_id, school_year_id=year_id, class_group_id=class_id, student_user_id=ids["student"], is_demo=True))
+    db.flush()
     db.add(GuardianLink(id=uuid.uuid4(), guardian_user_id=ids["parent"], child_user_id=ids["student"], school_id=school_id, relationship="demo", is_demo=True))
+    db.flush()
     ct = Base.metadata.tables["school_class_teacher"]
     db.execute(insert(ct).values(
         id=uuid.uuid4(), school_id=school_id, class_group_id=class_id,

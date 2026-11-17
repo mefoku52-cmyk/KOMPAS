@@ -46,8 +46,44 @@ import app.modules.k13_parent_center.domain.models  # noqa: F401,E402
 import app.modules.k16_intelligent_core.domain.models  # noqa: F401,E402
 
 
+PG_TEST_URL = os.environ.get("KOMPAS_TEST_DATABASE_URL", "")
+if not PG_TEST_URL and os.environ.get("DATABASE_URL", "").startswith("postgres"):
+    PG_TEST_URL = os.environ["DATABASE_URL"]
+
+
+def _defer_pg_foreign_keys(engine) -> None:
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT c.conname, c.conrelid::regclass::text AS table_name "
+            "FROM pg_constraint c "
+            "JOIN pg_namespace n ON n.oid = c.connamespace "
+            "WHERE c.contype = 'f' AND n.nspname = current_schema()"
+        )).all()
+        for name, table_name in rows:
+            conn.execute(text(
+                f'ALTER TABLE {table_name} ALTER CONSTRAINT "{name}" DEFERRABLE INITIALLY DEFERRED'
+            ))
+
+
 @pytest.fixture()
 def db_session(tmp_path):
+    if PG_TEST_URL:
+        from sqlalchemy.pool import NullPool
+        engine = create_engine(PG_TEST_URL, poolclass=NullPool, future=True)
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
+        _defer_pg_foreign_keys(engine)
+        TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+        session = TestingSession()
+        try:
+            yield session
+        finally:
+            session.close()
+            Base.metadata.drop_all(engine)
+            engine.dispose()
+        return
     db_url = f"sqlite:///{tmp_path}/test.db"
     engine = create_engine(db_url, connect_args={"check_same_thread": False}, future=True)
     TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
