@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 
-class FileStorage:
+class FileStorage(ABC):
+    @abstractmethod
     def save(self, storage_key: str, data: bytes) -> str:
-        raise NotImplementedError
+        ...
 
+    @abstractmethod
     def read(self, storage_key: str) -> bytes:
-        raise NotImplementedError
+        ...
 
 
 class LocalFileStorage(FileStorage):
