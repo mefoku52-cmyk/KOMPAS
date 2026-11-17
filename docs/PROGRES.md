@@ -20,3 +20,4 @@
 | 8 | 8.8 | hotové | d8bb72b | 2026-11-16 | Aktualizácia PROGRES a kontrola FÁZY 8 (check_prod 8, čiastočný beh) |
 | 9 | 9.1 | hotové | 5da770f | 2026-11-17 | Doménové HTTP endpointy K-01..K-16, spoločné API utility, jednotné chyby, auth na statusoch |
 | 9 | 9.2 | hotové | 126be42 | 2026-11-17 | Testy jednotného formátu chýb, request_id a mapovania výnimiek |
+| 9 | 9.3 | hotové | ee458fa | 2026-11-17 | Stránkovanie, filtre a horné limity zoznamov overené testami |
