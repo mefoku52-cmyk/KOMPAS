@@ -32,3 +32,4 @@
 | 10 | 10.2 | hotové | 84a615e | 2026-11-17 | scripts/pg_dev.sh init/start/stop/status v .data/pg, heslom cez env/súbor; status overený |
 | 10 | 10.3 | hotové | 7f083bc | 2026-11-17 | Alembic upgrade head na PostgreSQL 18.6 prešiel všetkými migráciami; pg8000 driver |
 | 10 | 10.4 | hotové | 365dc9e | 2026-11-17 | scripts/test_pg.sh: plná sada 115 testov proti PostgreSQL zelená; odložené FK a test fixture |
+| 10 | 10.5 | hotové | 14cc869 | 2026-11-17 | EXPLAIN na 8 000 žiakoch/80 000 stavoch/50 000 auditoch; 15 zložených indexov, CHECK roly a nezáporných pokusov |
