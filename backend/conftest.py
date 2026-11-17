@@ -71,7 +71,10 @@ def _defer_pg_foreign_keys(engine) -> None:
 def db_session(tmp_path):
     if PG_TEST_URL:
         from sqlalchemy.pool import NullPool
-        engine = create_engine(PG_TEST_URL, poolclass=NullPool, future=True)
+        connect_args = {}
+        if PG_TEST_URL.startswith("postgres"):
+            connect_args = {"startup_params": {"options": "-c statement_timeout=300000"}}
+        engine = create_engine(PG_TEST_URL, poolclass=NullPool, connect_args=connect_args, future=True)
         Base.metadata.drop_all(engine)
         Base.metadata.create_all(engine)
         _defer_pg_foreign_keys(engine)
