@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config.settings import settings
 from app.core.errors import install_error_handlers
 from app.core.events.bus import bus
+from app.core.privacy import router as privacy_router
 from app.core.security.routes import router as auth_router
 
 
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(auth_router)
+    app.include_router(privacy_router)
 
     # Module registration mechanism: each module exposes register(app, bus)
     from app.modules.k16_intelligent_core import register as register_k16
