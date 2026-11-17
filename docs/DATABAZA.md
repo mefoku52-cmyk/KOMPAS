@@ -53,3 +53,6 @@ DATABASE_URL='postgresql+pg8000://kompas:...@127.0.0.1:55432/kompas' \
 Schéma sa nesmie meniť úpravou starých migrácií; každá zmena je nový súbor v
 `db/migrations/versions`. SQLite zostáva predvolená pre rýchly vývoj, PostgreSQL je
 cieľová produkčná databáza (D1).
+
+Overenie F10.3: `alembic upgrade head` na PostgreSQL 18.6 prešiel cez všetkých 17 migrácií
+bez dialektových úprav. Driver je `postgresql+pg8000` (čistý Python, bez kompilácie).
