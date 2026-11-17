@@ -26,7 +26,19 @@ class Settings(BaseSettings):
 
     jwt_secret_key: str = Field(..., alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
-    jwt_access_token_expire_minutes: int = Field(default=60, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
+    jwt_access_token_expire_minutes: int = Field(default=30, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
+    jwt_issuer: str = Field(default="kompas", alias="JWT_ISSUER")
+    jwt_audience: str = Field(default="kompas-api", alias="JWT_AUDIENCE")
+
+    rate_limit_login_attempts: int = Field(default=5, alias="RATE_LIMIT_LOGIN_ATTEMPTS")
+    rate_limit_login_window_seconds: int = Field(default=300, alias="RATE_LIMIT_LOGIN_WINDOW_SECONDS")
+    rate_limit_default_per_minute: int = Field(default=120, alias="RATE_LIMIT_DEFAULT_PER_MINUTE")
+    login_max_failures: int = Field(default=5, alias="LOGIN_MAX_FAILURES")
+    login_lockout_minutes: int = Field(default=15, alias="LOGIN_LOCKOUT_MINUTES")
+
+    # P6: externí poskytovatelia AI sa v tejto etape neimplementujú.
+    ai_provider: str = Field(default="null", alias="AI_PROVIDER")
+    ai_external_enabled: bool = Field(default=False, alias="AI_EXTERNAL_ENABLED")
 
     @field_validator("jwt_algorithm")
     @classmethod
@@ -40,6 +52,20 @@ class Settings(BaseSettings):
     def validate_jwt_secret_key(cls, value: str) -> str:
         if not value or not value.strip():
             raise ValueError("JWT_SECRET_KEY must be set (no default secret).")
+        return value
+
+    @field_validator("ai_provider")
+    @classmethod
+    def validate_ai_provider(cls, value: str) -> str:
+        if value != "null":
+            raise ValueError("only the null AI provider is implemented (P6).")
+        return value
+
+    @field_validator("ai_external_enabled")
+    @classmethod
+    def validate_ai_external_enabled(cls, value: bool) -> bool:
+        if value:
+            raise ValueError("external AI providers are not implemented (P6).")
         return value
 
     @field_validator("grade_min", "grade_max")
