@@ -18,3 +18,4 @@
 | 8 | 8.6 | hotové | d8bb72b | 2026-11-16 | docs/FLOW.md (skutočný priebeh, HTTP vs service, medzery) |
 | 8 | 8.7 | hotové | d8bb72b | 2026-11-16 | docs/PRODUKCIA_ROZHODNUTIA.md (otvorené body/rozhodnutia) |
 | 8 | 8.8 | hotové | d8bb72b | 2026-11-16 | Aktualizácia PROGRES a kontrola FÁZY 8 (check_prod 8, čiastočný beh) |
+| 9 | 9.1 | hotové | 5da770f | 2026-11-17 | Doménové HTTP endpointy K-01..K-16, spoločné API utility, jednotné chyby, auth na statusoch |
