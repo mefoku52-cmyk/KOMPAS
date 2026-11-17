@@ -30,3 +30,4 @@
 | 9 | 9.10 | hotové | 4b842dc | 2026-11-17 | Plná sada 115 testov, alembic upgrade/downgrade/upgrade, N1 self-match opravený, storage abstraktný |
 | 10 | 10.1 | hotové | f2b91a3 | 2026-11-17 | Overené PostgreSQL 18.6, pg_dump, Redis 8.10.3; pg8000 a redis klient nainštalované |
 | 10 | 10.2 | hotové | 84a615e | 2026-11-17 | scripts/pg_dev.sh init/start/stop/status v .data/pg, heslom cez env/súbor; status overený |
+| 10 | 10.3 | hotové | 7f083bc | 2026-11-17 | Alembic upgrade head na PostgreSQL 18.6 prešiel všetkými migráciami; pg8000 driver |
