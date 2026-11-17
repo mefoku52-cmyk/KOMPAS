@@ -25,3 +25,4 @@
 | 9 | 9.5 | hotové | 901c58c | 2026-11-17 | JWT expirácia/issuer/audience, logout revocation, zmena hesla, politika a lockout |
 | 9 | 9.6 | hotové | 8ee0b34 | 2026-11-17 | scripts/manage.py: školy, používatelia, heslá, deaktivácia, rollover, export auditu |
 | 9 | 9.7 | hotové | 2e86467 | 2026-11-17 | Prechod roka: nové triedy/ročníky, história, idempotencia, absolventi podľa GRADE_MAX |
+| 9 | 9.8 | hotové | 7fa553c | 2026-11-17 | Export údajov žiaka JSON s povinným účelom, rolami a auditom; anonymizácia iba ADR |
