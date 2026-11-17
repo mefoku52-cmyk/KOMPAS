@@ -22,3 +22,4 @@
 | 9 | 9.2 | hotové | 126be42 | 2026-11-17 | Testy jednotného formátu chýb, request_id a mapovania výnimiek |
 | 9 | 9.3 | hotové | ee458fa | 2026-11-17 | Stránkovanie, filtre a horné limity zoznamov overené testami |
 | 9 | 9.4 | hotové | 7c53cc0 | 2026-11-17 | In-memory rate limiter, prísnejší login limit a konfigurácia |
+| 9 | 9.5 | hotové | 901c58c | 2026-11-17 | JWT expirácia/issuer/audience, logout revocation, zmena hesla, politika a lockout |
