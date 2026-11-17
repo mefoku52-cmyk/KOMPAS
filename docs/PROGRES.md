@@ -33,3 +33,4 @@
 | 10 | 10.3 | hotové | 7f083bc | 2026-11-17 | Alembic upgrade head na PostgreSQL 18.6 prešiel všetkými migráciami; pg8000 driver |
 | 10 | 10.4 | hotové | 365dc9e | 2026-11-17 | scripts/test_pg.sh: plná sada 115 testov proti PostgreSQL zelená; odložené FK a test fixture |
 | 10 | 10.5 | hotové | 14cc869 | 2026-11-17 | EXPLAIN na 8 000 žiakoch/80 000 stavoch/50 000 auditoch; 15 zložených indexov, CHECK roly a nezáporných pokusov |
+| 10 | 10.6 | hotové | 76b88cc | 2026-11-17 | DB_POOL_* a DB_STATEMENT_TIMEOUT_MS z env; QueuePool pre PostgreSQL, statement_timeout cez startup_params |
