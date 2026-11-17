@@ -26,6 +26,7 @@ a `redis` (čistý Python klient). `psql` CLI v Termuxe funguje; `sqlite3` CLI n
 ## Lokálna PostgreSQL inštancia
 
 Lokálna vývojová inštancia sa spravuje cez `scripts/pg_dev.sh` a žije v `.data/pg`.
+Heslo sa ukladá do `.data/pg_password` (mód 600, mimo gitu) alebo sa zadá cez `PGPASSWORD`.
 Príkazy:
 
 ```bash
