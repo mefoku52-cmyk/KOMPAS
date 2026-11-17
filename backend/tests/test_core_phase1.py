@@ -9,7 +9,7 @@ from app.core.permissions.policy import Scope, Visibility, authorize
 from app.core.security.auth import create_access_token, decode_access_token, hash_password, verify_password
 from app.shared.identity import GuardianLink, RoleAssignment, User
 from app.shared.school import ClassGroup, Enrollment, School, SchoolYear
-from app.shared.types import Principal, Role
+from app.shared.types import Principal, Role, new_uuid, utc_now
 
 
 def _principal(user_id=None, role=None, school_id=None):
@@ -85,8 +85,21 @@ def test_audit_chain_and_tamper_detection(db_session):
     db_session.commit()
     ok, bad_id = verify_chain(db_session)
     assert ok is True and bad_id is None
-    row = db_session.query(AuditLog).first()
-    row.outcome = "tampered"
+    tampered = AuditLog(
+        id=new_uuid(),
+        timestamp=utc_now(),
+        principal_id=None,
+        principal_role=None,
+        school_id=None,
+        action="tampered",
+        resource="tampered",
+        purpose=None,
+        outcome="tampered",
+        details="{}",
+        prev_hash="0" * 64,
+        record_hash="f" * 64,
+    )
+    db_session.add(tampered)
     db_session.commit()
     ok2, bad_id2 = verify_chain(db_session)
     assert ok2 is False
@@ -128,3 +141,20 @@ def test_auth_bad_password_and_expired_token(db_session):
     from fastapi import HTTPException
     with pytest.raises(HTTPException):
         decode_access_token(tok)
+
+
+def test_audit_log_append_only(db_session):
+    p = _principal(role=Role.TEACHER)
+    audit_write(db_session, p, "a", "r", None, "ok")
+    db_session.commit()
+    row = db_session.query(AuditLog).first()
+    row.outcome = "tampered"
+    with pytest.raises(Exception):
+        db_session.commit()
+    db_session.rollback()
+
+    row = db_session.query(AuditLog).first()
+    db_session.delete(row)
+    with pytest.raises(Exception):
+        db_session.commit()
+    db_session.rollback()

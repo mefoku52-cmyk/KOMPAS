@@ -67,6 +67,34 @@ def _defer_pg_foreign_keys(engine) -> None:
             ))
 
 
+def _create_audit_triggers(engine) -> None:
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(text(
+                "CREATE OR REPLACE FUNCTION audit_log_reject_mutation() "
+                "RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'audit_log is append-only'; END; $$ "
+                "LANGUAGE plpgsql"
+            ))
+            conn.execute(text("DROP TRIGGER IF EXISTS audit_log_append_only ON audit_log"))
+            conn.execute(text(
+                "CREATE TRIGGER audit_log_append_only BEFORE UPDATE OR DELETE ON audit_log "
+                "FOR EACH ROW EXECUTE FUNCTION audit_log_reject_mutation()"
+            ))
+        else:
+            conn.execute(text("DROP TRIGGER IF EXISTS audit_log_append_only_update"))
+            conn.execute(text("DROP TRIGGER IF EXISTS audit_log_append_only_delete"))
+            conn.execute(text(
+                "CREATE TRIGGER audit_log_append_only_update BEFORE UPDATE ON audit_log "
+                "BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END"
+            ))
+            conn.execute(text(
+                "CREATE TRIGGER audit_log_append_only_delete BEFORE DELETE ON audit_log "
+                "BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END"
+            ))
+
+
 @pytest.fixture()
 def db_session(tmp_path):
     if PG_TEST_URL:
@@ -78,6 +106,7 @@ def db_session(tmp_path):
         Base.metadata.drop_all(engine)
         Base.metadata.create_all(engine)
         _defer_pg_foreign_keys(engine)
+        _create_audit_triggers(engine)
         TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
         session = TestingSession()
         try:
@@ -91,6 +120,7 @@ def db_session(tmp_path):
     engine = create_engine(db_url, connect_args={"check_same_thread": False}, future=True)
     TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     Base.metadata.create_all(engine)
+    _create_audit_triggers(engine)
     session = TestingSession()
     try:
         yield session
