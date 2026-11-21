@@ -101,3 +101,23 @@ def test_get_latest_intervention_message_returns_neutral_text():
     assert msg is not None
     assert "bežná súčasť učenia" in msg # Overenie neutrálneho, neodsudzujúceho tónu
     assert "Si šikovný" not in msg # Overenie, že tam nie je manipulácia/chvála
+
+
+def test_ignores_health_and_family_metrics():
+    from unittest.mock import MagicMock
+    from app.modules.k17_wellbeing_companion.services.service import WellbeingAnalyticService
+    from app.modules.k17_wellbeing_companion.repository.models import BehavioralState
+
+    mock_db = MagicMock()
+    mock_db.query().filter().order_by().limit().all.return_value = []
+    mock_db.add = MagicMock()
+    mock_db.commit = MagicMock()
+    mock_db.refresh = MagicMock()
+
+    service = WellbeingAnalyticService(db_session=mock_db)
+    obs = service.record_observation(
+        student_id="test-health-1",
+        event_type="mission_answer",
+        metrics={"is_correct": False, "time_taken_sec": 2.0, "consecutive_errors": 1, "health": "sick", "weight": 50, "family_status": "divorced"},
+    )
+    assert obs.inferred_state == BehavioralState.AVOIDANCE
