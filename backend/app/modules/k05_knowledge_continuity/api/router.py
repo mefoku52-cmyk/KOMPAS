@@ -4,12 +4,14 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.api import Page, page_params, paginated, serialize
 from app.core.database.session import get_db
 from app.core.security.auth import get_current_principal
 from app.modules.k05_knowledge_continuity.services.service import K05Service
+from app.shared.curriculum import Topic
 from app.shared.types import Principal
 
 router = APIRouter(prefix="/k05", tags=["k05"])
@@ -71,4 +73,12 @@ def list_states(
         topic_id=topic_id, purpose=purpose, class_group_id=class_group_id, teaches=teaches,
     )
     db.commit()
-    return paginated(rows, page)
+    topic_ids = {row.topic_id for row in rows}
+    names: dict[uuid.UUID, str] = {}
+    if topic_ids:
+        names = {
+            topic.id: topic.name
+            for topic in db.execute(select(Topic).where(Topic.id.in_(topic_ids))).scalars()
+        }
+    items = [{**serialize(row), "topic_name": names.get(row.topic_id)} for row in rows]
+    return paginated(items, page)

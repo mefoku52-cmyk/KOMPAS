@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database.session import Base
 from app.shared.identity import GuardianLink
+from app.shared.progress import resolve_effective_states, status_value
 
 
 class K13Repository:
@@ -30,6 +31,11 @@ class K13Repository:
             stmt = stmt.where(GuardianLink.school_id == school_id)
         return self.db.execute(stmt).first() is not None
 
+    def get_user_full_name(self, user_id: uuid.UUID) -> str | None:
+        from app.shared.identity import User
+
+        return self.db.execute(select(User.full_name).where(User.id == user_id)).scalars().first()
+
     def get_child_progress_summary(self, school_id: uuid.UUID, child_user_id: uuid.UUID) -> dict[str, Any]:
         table = Base.metadata.tables.get("progress_topic_state")
         if table is None:
@@ -37,17 +43,12 @@ class K13Repository:
         rows = self.db.execute(
             select(table).where(table.c.school_id == school_id, table.c.student_user_id == child_user_id)
         ).all()
-        latest: dict[Any, Any] = {}
-        for r in rows:
-            key = r.topic_id
-            prev = latest.get(key)
-            if prev is None or (r.valid_from, r.version) > (prev.valid_from, prev.version):
-                latest[key] = r
+        latest = resolve_effective_states(rows, key=lambda r: r.topic_id)
         by_status: dict[str, int] = defaultdict(int)
         by_kind: dict[str, int] = defaultdict(int)
         for r in latest.values():
-            status = getattr(r.status, "value", r.status)
-            kind = getattr(r.kind, "value", r.kind)
+            status = status_value(r.status)
+            kind = status_value(r.kind)
             by_status[str(status)] += 1
             by_kind[str(kind)] += 1
         return {"tracked_pairs": len(latest), "by_status": dict(by_status), "by_kind": dict(by_kind)}

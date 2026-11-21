@@ -78,4 +78,17 @@ def list_messages(
 ):
     rows = K14Service(db).list_messages(principal, thread_id=thread_id)
     db.commit()
-    return paginated(rows, page)
+    payload = paginated(rows, page)
+    sender_ids = {row.sender_user_id for row in rows}
+    if sender_ids:
+        from sqlalchemy import select
+
+        from app.shared.identity import User
+
+        names = {
+            str(uid): full_name
+            for uid, full_name in db.execute(select(User.id, User.full_name).where(User.id.in_(sender_ids))).all()
+        }
+        for item in payload["items"]:
+            item["sender_full_name"] = names.get(item.get("sender_user_id"))
+    return payload

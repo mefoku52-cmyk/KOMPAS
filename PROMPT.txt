@@ -1,0 +1,672 @@
+Výsledok je prompt uložený ako súbor `~/KOMPAS/docs/OPENCODE_PROMPT.md`, jedným cat EOF blokom podľa tvojho zadania. Vychádza z presnej kostry, ktorú si vygeneroval (221 `.py` v moduloch a 304 súborov, čo sedí s výpisom).
+
+Z tvojho výpisu som si všimol dve veci:
+- `__pycache__` zostal v strome, lebo import bežal po čistení. Je to neškodné, prompt to rieši vo fáze 0.
+- Podľa `cpython-314` je v Termuxe Python 3.14. Prompt preto nariaďuje overiť inštalovateľnosť závislostí a pri zlyhaní zastaviť a nahlásiť.
+
+KROK 1: Uloženie implementačného promptu pre OpenCode
+POPIS: Vytvorí sa jeden Markdown súbor s kompletnými pokynmi: pravidlá, prostredie, architektonické obmedzenia, presná kostra, 8 fáz s krokmi, špecifikácia všetkých 16 modulov, definícia hotového stavu a formát reportov.
+SUBORY: ~/KOMPAS/docs/OPENCODE_PROMPT.md
+
+IMPLEMENTACIA:
+```bash
+cat > ~/KOMPAS/docs/OPENCODE_PROMPT.md <<'EOF'
+# KOMPAS - implementačný prompt pre OpenCode
+
+## 0. ROLA A CIEĽ
+
+Si senior technický architekt a forenzný inžinier. Tvojou úlohou je zmeniť existujúcu prázdnu kostru projektu KOMPAS v adresári ~/KOMPAS na reálne fungujúcu, testovateľnú aplikáciu (backend + frontend + databáza + dokumentácia).
+
+KOMPAS je inteligentný partner školy pre štyroch rovnocenných používateľov: žiak, učiteľ, vedenie školy, rodič. Rovnocennosť znamená rovnaký rešpekt, nie rovnaké oprávnenia na údaje. Systém podporuje, nekontroluje.
+
+Cieľový stav: po dokončení všetkých fáz sa backend spustí jedným príkazom, všetky testy prejdú, frontend sa zostaví, a tok udalostí z architektonického návrhu (žiak rieši úlohu, vyhodnotenie, uloženie, analytika, triedny prehľad učiteľa, osobný pokrok žiaka, doplňujúce precvičovanie) funguje od začiatku do konca na demonštračných dátach.
+
+## 1. ZÁVÄZNÉ PRAVIDLÁ (porušenie = zastav sa a nahlás)
+
+1. Nepoužívaj emoji nikde (kód, dokumentácia, UI, commity).
+2. Nepredpokladaj nič, čo nie je v tomto dokumente. Ak niečo chýba alebo je nejasné, ZASTAV SA a spýtaj sa. Nikdy si nedomýšľaj zásadné veci.
+3. Každý krok implementuj samostatne. Po každom kroku: kontrola syntaxe, test funkčnosti, výpis výsledku do terminálu. Až keď je krok plne funkčný, pokračuj.
+4. Ak test zlyhá: zastav sa, identifikuj príčinu, oprav ju, spusti znova. Nepokračuj s červeným testom. Test nikdy neoslabuj ani nemaž, aby prešiel.
+5. Ochrana existujúcej práce: nemaž, nepremenúvaj a neprepisuj funkčné súbory. Pred zmenou súboru, ktorý má prechádzajúce testy, spusti celú sadu testov (stav pred), po zmene znova (stav po). Regresia = okamžitá oprava.
+6. Súbory v kostre (sekcia 5) sú záväzné. Nové súbory sú dovolené iba v zozname z bodu 5.3, ostatné vyžadujú záznam v docs/adr/ (číslovaný ADR s odôvodnením).
+7. Žiadne tajomstvá v repozitári. Všetko cez premenné prostredia, vzor v .env.example, skutočný .env v .gitignore.
+8. Žiadne vymyslené alebo skutočné osobné údaje. Demonštračné dáta musia byť výslovne označené (pole is_demo = true) a v dokumentácii označené ako ilustračné.
+9. Žiadne tvrdenia o fungovaní bez dôkazu. Každé tvrdenie v reporte musí byť podložené výpisom z terminálu.
+10. Používaj git: po každom úspešnom kroku jeden commit so zrozumiteľnou správou (bez emoji). Slúži ako bod návratu.
+11. Identifikátory v kóde po anglicky, texty pre používateľa a dokumentácia po slovensky. Texty pre používateľa nikdy natvrdo v kóde, iba cez locales.
+12. Žiadne skratky bez vysvetlenia pri prvom použití v dokumentácii.
+
+## 2. PROSTREDIE - NAJSKÔR ZISTI, NEPREDPOKLADAJ
+
+Projekt beží v Termuxe na Androide (shell prompt trc-hack#root), Python podľa pycache je 3.14. Neviem, čo je nainštalované. Vo FÁZE 0 zisti a nahlás: verzie python3, pip, node, npm, git, dostupnosť sqlite3, psql, redis-server, docker. Docker v Termuxe pravdepodobne nie je k dispozícii, preto infra/ zostáva zatiaľ zástupná.
+
+Pravidlo pre závislosti: pred pridaním knižnice over, že sa dá nainštalovať v tomto prostredí (pip install do backend/.venv). Ak natívna kompilácia zlyhá, ZASTAV SA, nahlás presnú chybu a navrhni alternatívy. Nikdy potichu nenahraď knižnicu za vlastnú implementáciu kryptografie.
+
+## 3. ARCHITEKTONICKÉ OBMEDZENIA (nie marketing, ale testovateľné požiadavky)
+
+KOMPAS NEBUDE a kód to nesmie umožňovať:
+- náhrada učiteľa,
+- automatický hodnotiteľ osobnosti dieťaťa (žiadne psychologické ani behaviorálne odvodzovanie o žiakovi),
+- systém na sledovanie a trestanie žiakov,
+- AI, ktorá si sama prisvojuje pedagogické rozhodnutia (AI iba navrhuje, rozhodnutie robí človek a je zaznamenané),
+- náhrada EduPage bez dôvodu (integrácia je mimo rozsahu tohto promptu, iba rozhranie pripravené v docs).
+
+KOMPAS MUSÍ:
+- Rovnocennosť rolí, ale oddelené oprávnenia: rodič nevidí učiteľské poznámky, učiteľ nevidí súkromnú rodičovskú komunikáciu. Každý modul dostane iba údaje, na ktoré má oprávnenie.
+- Rozlišovať tri veci: učivo prebraté, učivo precvičené, vedomosti s overeným zvládnutím. Overené zvládnutie sa nikdy nesmie odvodiť iba z precvičovania.
+- Časová platnosť, verzie a história: údaje majú valid_from, valid_to, version. Pri prechode do ďalšieho ročníka sa nič nestratí. Prípravy učiteľa prežijú zmenu školského roka.
+- AI pamäť nie je zdroj pravdy. Pravdivé údaje sú iba v štruktúrovaných záznamoch. Každý záznam kontextovej pamäte odkazuje na zdrojový štruktúrovaný záznam.
+- Používateľské prostredia nie sú závislé od konkrétneho AI modelu. Výmena modelu nemení iné moduly.
+- Udalosťami riadená komunikácia medzi modulmi. Moduly sa nevolajú navzájom priamo cez interné objekty, iba cez udalosti alebo verejné rozhranie service vrstvy.
+- Auditná stopa dôležitých operácií (prístupy k údajom žiakov, zmeny, AI volania).
+- Modulárny monolit s čistými hranicami (moduly sa dajú neskôr oddeliť). Zákaz importu z interných vrstiev cudzieho modulu (repository, domain iného modulu). Over to testom (kontrola importov).
+
+## 4. OTVORENÉ ROZHODNUTIA (používateľ ich ešte neuzavrel)
+
+Tieto štyri veci NIE JE dovolené natvrdo zakódovať ani rozhodnúť za používateľa:
+1. Veková skupina / rozsah ročníkov: implementuj ako konfiguráciu GRADE_MIN a GRADE_MAX. Technická predvolená hodnota 1 a 9 platí iba kým používateľ nerozhodne a musí byť v reporte označená ako dočasná.
+2. Zariadenia: frontend musí byť responzívny (telefón, tablet, počítač, interaktívna tabuľa), nerozhoduj o prioritách zariadení.
+3. AI architektúra (hybridná / lokálna / cloudová): implementuj iba rozhranie ModelProvider a konfiguráciu poskytovateľov. Dodaj deterministický NullProvider (bez siete) pre testy a offline režim. Žiadny API kľúč v kóde. Žiadne údaje o žiakoch do externého poskytovateľa bez povolenia pravidlového systému (rule_system).
+4. Nasadenie (samostatná inštancia / centrálna platforma / hybrid): implementuj pole school_id vo všetkých dátach súvisiacich so školou (základ pre oddelenie školských prostredí), ale nerob rozhodnutie o nasadení.
+
+Technické rozhodnutia, ktoré som urobil ja (architekt), a ktoré sa musia zapísať do docs/adr/:
+- D1: SQLAlchemy 2.x (synchrónny režim) je jediný zdroj pravdy pre schému. Cieľová produkčná databáza je PostgreSQL, vývoj a testy bežia nad SQLite cez DATABASE_URL. Kód nesmie používať funkcie špecifické pre jednu databázu mimo jednej dokumentovanej adaptérovej vrstvy.
+- D2: Migrácie cez Alembic s adresárom db/migrations. Súbory db/schema/*.sql sú generované exporty DDL pre PostgreSQL (skript scripts/export_schema.py), nie ručne písané.
+- D3: Konvencia názvov tabuliek: prefix podľa dátovej oblasti: identity_, school_, curriculum_, learning_, progress_, teacher_workspace_, organization_, communication_, ai_knowledge_, audit_. Každá tabuľka patrí presne jednej oblasti (test).
+- D4: Redis a pgvector sú za rozhraniami (cache/fronta, KnowledgeIndex). Predvolené implementácie sú v procese (in-memory fronta, vyhľadávanie kľúčových slov nad schválenými dokumentmi). Plnohodnotný pgvector je mimo rozsahu, kým nebude PostgreSQL k dispozícii.
+- D5: Autentifikácia: overená knižnica pre JWT a hashovanie hesiel (argon2 alebo scrypt zo štandardnej knižnice). Žiadna vlastná kryptografia.
+- D6: Súbory a médiá cez rozhranie FileStorage s lokálnou implementáciou (adresár mimo gitu). S3-kompatibilná implementácia je mimo rozsahu.
+- D7: Frontend čerpá preklady z koreňového locales/ (zdroj pravdy). Skript scripts/sync_locales.sh ich skopíruje do frontend/src/locales (adresár generovaný, v .gitignore).
+
+Prekrývanie, ktoré som identifikoval a ktoré musíš dodržať:
+- core/audit (zápisová cesta) vs k16 audit_engine (čítanie, dotazy, reporty). Zápis je iba v core/audit, k16 audit_engine iba číta.
+- core/permissions (prístup ľudí k údajom) vs k16 rule_system (pravidlá správania AI). rule_system používa core/permissions, nie naopak.
+- core/events (infraštruktúra zbernice) vs events/handlers.py v moduloch (obsluha udalostí daného modulu). Moduly iba registrujú handlery.
+
+## 5. EXISTUJÚCA KOSTRA (záväzná)
+
+Koreň: ~/KOMPAS
+
+5.1 Strom (vytvorený skriptom scripts/build_tree.sh, všetky súbory sú zatiaľ prázdne):
+- README.md, .gitignore, .env.example
+- backend/requirements.txt, backend/pyproject.toml
+- backend/app/__init__.py, main.py
+- backend/app/core/{config,security,database,events,audit,permissions}/__init__.py
+  plus config/settings.py, security/auth.py, database/session.py, events/bus.py, audit/logger.py, permissions/policy.py
+- backend/app/shared/__init__.py, types.py
+- backend/app/modules/__init__.py
+- backend/app/modules/<modul>/ pre 16 modulov, každý s: __init__.py, api/{__init__,router}.py, domain/{__init__,models}.py, services/{__init__,service}.py, repository/{__init__,repository}.py, events/{__init__,handlers}.py, tests/{__init__,test_service}.py
+- názvy modulov: k01_learning_profile, k02_subject_workspace, k03_adaptive_learning, k04_missions, k05_knowledge_continuity, k06_virtual_lab, k07_professional_library, k08_work_assistant, k09_class_overview, k10_organization_center, k11_operations_center, k12_analytics_center, k13_parent_center, k14_communication_center, k15_collaboration_projects, k16_intelligent_core
+- k16_intelligent_core má navyše podsystémy (každý s __init__.py a service.py): orchestrator, knowledge_system, context_memory, rule_system, analytics_engine, audit_engine
+- db/schema/{identity,school,curriculum,learning,progress,teacher_workspace,organization,communication,ai_knowledge,audit}.sql, db/migrations/.gitkeep, db/seeds/.gitkeep
+- frontend/package.json, tsconfig.json, src/app/{layout,page}.tsx, src/app/{student,teacher,leadership,parent}/page.tsx, src/lib/api.ts, src/components/, src/locales/, tests/
+- locales/{sk,en}/common.json
+- docs/architecture/system_architecture.md, docs/adr/0001-identity-partner.md, docs/{api-contracts,events,permissions,data-model,research,metrics}/README.md, docs/modules/K-01.md až K-16.md
+- tests/integration/test_smoke.py, tests/e2e/, infra/{docker,ops}/
+
+5.2 Kontrola kostry: vo FÁZE 0 over, že strom zodpovedá tomuto popisu (očakávané: 221 súborov .py pod backend/app/modules, 304 súborov v celom projekte pred pridaním čohokoľvek). Odchýlky zaznamenaj.
+
+5.3 Povolené doplnenia bez ADR:
+- backend/app/shared/identity.py, school.py, curriculum.py (modely oblastí identity, school, curriculum, ktoré nepatria žiadnemu modulu)
+- backend/app/core/security/routes.py (prihlásenie)
+- backend/conftest.py, backend/alembic.ini
+- db/migrations/env.py, db/migrations/script.py.mako, db/migrations/versions/*.py
+- scripts/export_schema.py, scripts/sync_locales.sh, scripts/seed_demo.py, scripts/run_dev.sh
+- docs/BASELINE.md, docs/REPORT_FAZA_<n>.md
+
+## 6. POSTUP PO FÁZACH
+
+Po každej fáze zastav a čakaj na moje schválenie. Max. 10 krokov na fázu.
+
+FAZA 0 - Audit a základ (žiadne zmeny kódu okrem .gitignore, git init, docs/BASELINE.md)
+0.1 Zisti prostredie (sekcia 2), vypíš verzie a dostupnosť nástrojov.
+0.2 Over kostru podľa 5.2, vypíš počty a odchýlky.
+0.3 Zaznamenaj všetky problémy a duplicity (sekcia 4 prekrývanie, prázdne súbory, zostatky __pycache__).
+0.4 Doplň .gitignore (.env, __pycache__, *.pyc, .venv, node_modules, .next, *.log, .data/, frontend/src/locales/), ak je prázdny. git init ak treba, prvý commit baseline.
+0.5 Vytvor backend/.venv, over inštaláciu základných závislostí (fastapi, uvicorn, sqlalchemy, alembic, pydantic, pytest, httpx a overená knižnica pre JWT/hashovanie). Pri zlyhaní zastav a nahlás.
+0.6 Zapíš docs/BASELINE.md (prostredie, odchýlky, problémy, zvolené knižnice s presnými verziami). Zapíš ADR pre D1 až D7. Vytvor requirements.txt s pripnutými verziami. Zastav sa.
+
+FAZA 1 - Jadro (backend/app/core a shared)
+1.1 config/settings.py: nastavenia z prostredia, bez predvolených tajomstiev, validácia pri štarte, parametre GRADE_MIN, GRADE_MAX, DATABASE_URL, JWT parametre, port. Doplň .env.example (bez hodnôt tajomstiev).
+1.2 database/session.py: engine, session factory, deklaratívna Base, závislosť get_db, podpora SQLite aj PostgreSQL cez DATABASE_URL.
+1.3 shared/types.py: UUID identifikátory, enum Role (student, teacher, leadership, parent), interná systémová identita pre obsluhu udalostí, dataclass Principal, mixin ValidityMixin (valid_from, valid_to, version, is_demo).
+1.4 shared/identity.py, school.py, curriculum.py: modely User, Role assignment, GuardianLink (rodič-dieťa), School, SchoolYear, ClassGroup, Enrollment (žiak v triede v školskom roku), Subject, Topic (učivo s ročníkom a predmetom, hierarchia). Všetky s prefixom tabuliek podľa D3 a school_id.
+1.5 audit/logger.py: iba pridávacia (append-only) tabuľka audit_log, funkcia write(principal, action, resource, purpose, outcome). Reťazenie záznamov hashom (sha256 predchádzajúceho záznamu) a funkcia verify_chain(). Žiadna operácia update ani delete.
+1.6 permissions/policy.py: rozhodovacia funkcia authorize(principal, action, resource, context) vracia povolenie alebo zamietnutie s dôvodom. Rozsahy: SELF, GUARDIAN_OF, TEACHES_CLASS, SCHOOL_AGGREGATE, SCHOOL_INDIVIDUAL_WITH_PURPOSE (vedenie vidí individuálne údaje žiaka iba s uvedeným účelom, ktorý sa zapíše do auditu). Triedy viditeľnosti: TEACHER_PRIVATE_NOTE, PARENT_PRIVATE_COMMUNICATION a ďalšie podľa potreby. Zamietnutie je predvolené (deny by default).
+1.7 security/auth.py a security/routes.py: hashovanie hesiel, vydanie a overenie tokenu, závislosť get_current_principal, endpoint prihlásenia. Každé prihlásenie a zlyhanie sa zapíše do auditu.
+1.8 events/bus.py: typované doménové udalosti (dataclass s event_id, typ, čas, school_id, payload), registrácia handlerov, publikovanie, izolácia chýb handlera (chyba sa zaloguje, publikujúci nespadne), perzistencia log udalostí do tabuľky pre spätné prehratie.
+1.9 main.py: vytvorenie aplikácie, endpoint /health, mechanizmus registrácie modulov (každý modul vystaví funkciu register(app, bus)), zatiaľ s prázdnym zoznamom modulov.
+1.10 Testy jadra: authorize (povolené aj zamietnuté prípady), audit reťaz (aj detekcia manipulácie), bus (izolácia chýb), auth (zlé heslo, expirovaný token). Spusti celú sadu.
+
+FAZA 2 - Migrácie a schéma
+2.1 Alembic nakonfigurovaný na db/migrations, cieľ metadata z Base. Prvá migrácia pre tabuľky jadra a shared.
+2.2 scripts/export_schema.py: vygeneruje db/schema/<oblasť>.sql podľa prefixu tabuliek (dialekt PostgreSQL).
+2.3 Test konvencie D3: každá tabuľka má známy prefix a patrí práve jednej oblasti; všetkých 10 oblastí je pokrytých súbormi v db/schema.
+2.4 Test migrácií: čistá databáza, upgrade na head, downgrade, opäť upgrade. Test bez chyby.
+2.5 Test hraníc modulov: žiadny modul neimportuje domain, repository ani services iného modulu (statická kontrola importov).
+2.6 scripts/run_dev.sh a dokumentácia spustenia v README.md.
+
+FAZA 3 - Moduly, skupina A: K-16, K-01, K-02, K-05, K-04, K-03
+FAZA 4 - Moduly, skupina B: K-09, K-07, K-08, K-10, K-11
+FAZA 5 - Moduly, skupina C: K-12, K-13, K-14, K-15, K-06
+
+Postup pre KAŽDÝ modul (samostatné kroky, každý s testom a commitom):
+a) domain/models.py + migrácia (nová verzia v db/migrations/versions, nikdy neupravuj staršiu),
+b) repository/repository.py (iba tu sa pristupuje k databáze),
+c) services/service.py (obchodná logika, volá authorize a audit pre každú operáciu s údajmi o osobách),
+d) events/handlers.py (publikuje a obsluhuje udalosti, registrácia cez register),
+e) api/router.py (tenké rozhranie, validácia cez pydantic, žiadna logika),
+f) tests/test_service.py (kladné aj záporné scenáre oprávnení),
+g) docs/modules/K-XX.md (účel, entity, udalosti, oprávnenia, endpointy, obmedzenia).
+Po poslednom kroku modulu ho zaregistruj v main.py a spusti celú sadu testov.
+
+FAZA 6 - Frontend
+6.1 Over node a npm. Ak chýbajú, zastav sa a nahlás. Inak vytvor Next.js (TypeScript, App Router) v frontend/ do existujúcej kostry.
+6.2 scripts/sync_locales.sh a načítanie prekladov (sk predvolené, en).
+6.3 src/lib/api.ts: klient s tokenom, ošetrenie chýb 401 a 403.
+6.4 layout.tsx a page.tsx: prihlásenie, presmerovanie podľa roly, responzívny základ.
+6.5 student/page.tsx: osobný pokrok (stav učiva v troch kategóriách), zadania, odovzdanie odpovede.
+6.6 teacher/page.tsx: triedny prehľad, knižnica príprav, asistent (návrh vyžaduje schválenie učiteľom).
+6.7 leadership/page.tsx: agregované prehľady, organizačné úlohy, prevádzkové požiadavky.
+6.8 parent/page.tsx: schválené informácie o vlastnom dieťati, komunikácia.
+6.9 Zostavenie (npm run build) a kontrola typov bez chýb.
+6.10 e2e testy v tests/e2e (Playwright), ak ich prostredie dovolí. Ak nie, nahlás dôvod a navrhni alternatívu, nepreskakuj potichu.
+
+FAZA 7 - Integrácia, dokumentácia a záver
+7.1 Integračný test hlavného toku zo sekcie 0 od začiatku do konca.
+7.2 Matica oprávnení: automatický test, že každá dvojica rola-zdroj-akcia z docs/permissions/README.md sa správa podľa matice (vrátane zamietnutí).
+7.3 Overenie auditu: reťaz audit_log je platná po celom integračnom toku.
+7.4 scripts/seed_demo.py: demonštračné dáta (is_demo = true), označené ako ilustračné.
+7.5 Generovanie dokumentácie: docs/api-contracts z OpenAPI, katalóg udalostí do docs/events, maticu oprávnení do docs/permissions, dátový model do docs/data-model.
+7.6 Finálne README.md: ako spustiť backend, frontend, testy, migrácie, seed.
+7.7 Bezpečnostná kontrola: žiadne tajomstvá v gite, žiadne endpointy bez autentifikácie okrem /health a prihlásenia, deny-by-default overené testom.
+7.8 docs/REPORT_FAZA_7.md: čo funguje (s dôkazmi), čo nie, čo zostáva, otvorené rozhodnutia.
+
+## 7. ŠPECIFIKÁCIA MODULOV (minimálny funkčný rozsah)
+
+K-16 Inteligentné jadro (robí sa ako prvé, ostatné naň nadväzujú)
+- orchestrator: rozhranie ModelProvider, NullProvider (deterministický), voliteľné ďalšie poskytovatele cez konfiguráciu. Výber poskytovateľa podľa úlohy. Každé volanie prejde cez rule_system a zapíše sa do auditu.
+- knowledge_system: register schválených zdrojov (učebné štandardy, schválené materiály), vyhľadávanie iba nad schválenými zdrojmi (KnowledgeIndex, predvolene kľúčové slová).
+- context_memory: záznamy kontextu vždy s odkazom na zdrojový štruktúrovaný záznam, s platnosťou. Nikdy sa neuznáva ako zdroj pravdy.
+- rule_system: zoznam povolených údajových polí pre AI, zoznam zakázaných akcií (pedagogické rozhodnutia, hodnotenie osobnosti), rozhodnutie povolenie/zamietnutie s dôvodom.
+- analytics_engine: spracovanie udalostí na agregáty. audit_engine: iba čítanie a dotazy nad auditom (zápis je v core/audit).
+
+K-01 Osobný vzdelávací profil: profil žiaka na školský rok a ročník, história sa nikdy neprepisuje (nový záznam na nový rok), prehľad histórie.
+K-02 Predmetové prostredie: predmet a konfigurovateľný strom učiva učiteľa (poradie, vnorenie) podľa jeho existujúceho plánu, bez núteného meniaceho sa rozvrhu.
+K-05 Znalostná kontinuita: záznam stavu témy pre žiaka s troma rozlíšenými druhmi (prebraté, precvičené, overené) a stavmi z návrhu: prebiehajúce precvičovanie, čiastočne zvládnuté, overené zvládnutie. Každá zmena stavu má dôkaz (odkaz na pokus) a platnosť. Stav overené zvládnutie vzniká iba z pokusu označeného ako overovací, nikdy z precvičovania. Odoberá udalosť vyhodnotenia odpovede.
+K-04 Vzdelávacie misie: misia, úlohy (typy s deterministickým vyhodnotením: výber, číselná odpoveď, text so zhodou), pokus žiaka, publikovanie udalosti AnswerEvaluated.
+K-03 Adaptívne učenie: odporúčanie ďalšieho precvičovania z K-05, deterministické a vysvetliteľné (každé odporúčanie obsahuje dôvod). Žiadne odvodzovanie vlastností osobnosti. Odporúčanie je návrh, ktorý učiteľ môže zmeniť.
+K-09 Triedny prehľad: rozdelenie stavov učiva v triede, iba pre triedy daného učiteľa.
+K-07 Profesijná knižnica: položky vlastnené učiteľom, verzie, štítky, archív prežívajúci zmenu školského roka, súbory cez FileStorage.
+K-08 Pracovný asistent: návrh pracovného listu alebo testu z knižnice a učiva cez orchestrátor. Výstup je koncept, ktorý musí učiteľ schváliť. Funguje aj bez AI (šablónový režim).
+K-10 Organizačné centrum: úlohy, termíny, plán školy, priradenia.
+K-11 Prevádzkové centrum: požiadavky na priestory a vybavenie so stavovým tokom.
+K-12 Analytické centrum: agregované prehľady školy. Skupiny menšie než konfigurovateľný prah (predvolene 5) sa potláčajú. Individuálne údaje iba s uvedeným účelom (zapíše sa do auditu).
+K-13 Rodičovské centrum: väzba rodič-dieťa, prehľad schválených informácií o vlastnom dieťati. Rodič nikdy nevidí poznámky učiteľa označené ako súkromné.
+K-14 Komunikačné centrum: vlákna a správy medzi povolenými účastníkmi, súkromné vlákna viditeľné iba účastníkom, prístup k obsahu sa audituje.
+K-15 Spolupráca a projekty: projekt, členovia (aj medziročníkoví), úlohy, odovzdania.
+K-06 Virtuálne laboratórium: dátovo riadený rámec simulácií (definícia parametrov a deterministická funkcia výpočtu v registri) s jednou ukážkovou simuláciou. Rozšírenia neskôr.
+
+## 8. DEFINÍCIA HOTOVÉHO STAVU
+
+- Všetky testy (backend, integračné, a ak prostredie dovolí aj e2e) prechádzajú, výpis je v reporte.
+- Test hraníc modulov (žiadny import cudzích interných vrstiev) prechádza.
+- Migrácie prejdú upgrade, downgrade, upgrade na čistej databáze.
+- deny-by-default je overené negatívnymi testami pre každú rolu.
+- Reťaz auditu je platná po integračnom toku.
+- Backend sa spustí jedným príkazom z README.md, frontend sa zostaví.
+- Žiadne tajomstvá v gite, žiadne emoji.
+- Každý modul má vyplnený docs/modules/K-XX.md.
+- docs/REPORT_FAZA_7.md uvádza otvorené rozhodnutia a čo nie je hotové, bez prikrášľovania.
+
+## 9. FORMÁT KAŽDEJ ODPOVEDE
+
+KROK [číslo]: [Názov kroku]
+POPIS: stručný popis, čo sa bude diať
+SUBORY: zoznam vytvorených alebo upravených súborov
+IMPLEMENTACIA: vykonané príkazy, syntaktická kontrola a test
+VYSLEDOK: skutočný výpis z terminálu (nie očakávaný)
+PRICINA: prečo bol krok potrebný
+INE MOZNOSTI: aké iné možnosti boli zvážené a prečo zamietnuté
+RIZIKA: identifikované riziká a ako boli eliminované
+
+Ak si v niečom neistý, spýtaj sa. Teraz začni FÁZOU 0 a po jej dokončení sa zastav.
+EOF
+test -s ~/KOMPAS/docs/OPENCODE_PROMPT.md && echo "SUBOR OK" || echo "SUBOR CHYBA"
+grep -c '^FAZA ' ~/KOMPAS/docs/OPENCODE_PROMPT.md
+grep -c -P '[\x{1F300}-\x{1FAFF}]' ~/KOMPAS/docs/OPENCODE_PROMPT.md
+wc -l ~/KOMPAS/docs/OPENCODE_PROMPT.md
+```
+
+VYSLEDOK (očakávaný, nespustený):
+SUBOR OK
+8
+0
+(počet riadkov, rádovo 230)
+
+Ak `grep -P` v Termuxe nie je podporovaný, tretí príkaz vypíše chybu. Je to len kontrola emoji a nemá vplyv na súbor.
+
+Spustenie v OpenCode: otvor OpenCode v adresári `~/KOMPAS` a zadaj jednu správu: "Prečítaj celý súbor docs/OPENCODE_PROMPT.md a začni FÁZOU 0. Po jej dokončení sa zastav a čakaj na moje schválenie." Presnú syntax príkazov OpenCode som neoveroval, ak chceš spustiť prompt z príkazového riadku, skontroluj `opencode --help`.
+
+PRICINA: Samostatný súbor v repozitári zachová zadanie aj pre ďalšie relácie a ostáva verzovaný spolu s kódom. Fázy s povinným zastavením zodpovedajú tvojmu pravidlu overovať každý krok pred ďalším.
+INE MOZNOSTI: Jeden krátky príkaz typu "postav všetko" bol zamietnutý, agent by si domýšľal rozhodnutia a nemal by body návratu. Skutočný obsah súborov v kostre som do promptu nevkladal, sú prázdne a agent ich doplní podľa špecifikácie.
+RIZIKA:
+- Štyri otvorené rozhodnutia zo sekcie 11 dokumentu (ročníky, zariadenia, AI, nasadenie) a otázky z minulých správ (cesta, jazyky) zostávajú nezodpovedané. Prompt ich zámerne drží ako konfiguráciu a zakazuje ich zakódovať natvrdo.
+- Technické rozhodnutia D1 až D7 (SQLAlchemy, SQLite pre vývoj, Alembic, prefixy tabuliek) som urobil ja ako architekt, nie tvoj dokument. Skontroluj ich v sekcii 4 a ak niektoré nechceš, napíš mi.
+- Termux a Python 3.14 môžu odmietnuť niektoré knižnice. Prompt v takom prípade nariaďuje zastaviť sa, nie obchádzať.
+
+
+
+Áno, ale nie po každom kroku, iba po každej fáze. Prompt mu nariaďuje v rámci fázy pokračovať sám (krok, test, commit, ďalší krok) a po poslednom kroku sa zastaviť a čakať na tvoj súhlas. Fáz je 8 (0 až 7), takže schvaľuješ približne osemkrát. Ak sa uprostred fázy zastaví s otázkou alebo s červeným testom, ide o zámerné zastavenie podľa pravidiel 2 a 4 a treba mu odpovedať.
+
+Súbor je v poriadku: 23051 bajtov, 220 riadkov, 8 hlavičiek FAZA, 0 emoji, čo sedí s očakávaním.
+
+Schváleniu by mal predchádzať tvoj vlastný dôkaz, nielen jeho report. Po každej fáze spusti:
+
+```bash
+cd ~/KOMPAS && git log --oneline | head -20
+git status --short | head
+ls docs/REPORT_FAZA_* docs/BASELINE.md 2>&1
+cd backend && . .venv/bin/activate 2>/dev/null; python3 -m pytest -q 2>&1 | tail -15
+```
+
+Ak testy prejdú a report zodpovedá výpisu, pošli mu jednu z týchto správ:
+
+- Schválenie: `FAZA 0 schválená. Pokračuj FÁZOU 1 podľa docs/OPENCODE_PROMPT.md. Po jej dokončení sa zastav.`
+- Oprava: `FAZA 1 neschválená. Dôvod: [presný výpis z terminálu]. Oprav, spusti testy a pošli nový report. Nepokračuj do ďalšej fázy.`
+
+Pri FÁZE 0 skontroluj navyše, že existuje `docs/BASELINE.md`, že ADR pre D1 až D7 sú v `docs/adr/` a že závislosti sa nainštalovali bez chyby. Ak sa nenainštalovali, vo FÁZE 0 sa musí zastaviť a nahlásiť to, nie obísť.
+
+Ak sa vo FÁZE 0 opýta na jedno z otvorených rozhodnutí (ročníky, zariadenia, AI, nasadenie), odpovedz mu stručne alebo napíš "ponechaj konfiguráciu, rozhodnem neskôr". Prompt s oboma možnosťami počíta.
+
+Model v tvojom výpise je "Iceman Free" a nemám o ňom informácie, takže neviem, ako dobre zvládne takto rozsiahle zadanie. Preto sú fázy malé a dôkazy musíš overovať ty. Ak začne preskakovať testy alebo ich oslabovať, vráť sa na posledný commit (`git reset --hard <commit>`) a zadanie zúž na jeden krok.
+
+
+
+
+Áno, spustiť to v Termuxe bez OpenCode je v poriadku. Otvor druhú reláciu (potiahni z ľavého okraja a daj novú reláciu) alebo OpenCode ukonči. Príkazy iba čítajú projekt, pytest a alembic zapisujú len pomocné súbory.
+
+Aby si ma nepotreboval, dostaneš jeden skript `scripts/check_phase.sh`. Skript kontroluje fázu aj všetky predchádzajúce a na konci vypíše presnú správu na vloženie do OpenCode. Pri úspechu je to schválenie, pri zlyhaní zoznam chýb na opravu. Tebe teda stačí vložiť, čo vypíše.
+
+KROK 1: Uloženie overovacieho skriptu
+POPIS: Kontroluje existenciu a neprázdnosť súborov, syntax všetkých `.py`, pytest, cyklus migrácií, build frontendu, tajomstvá a emoji. Nič nemení v kóde projektu.
+SUBORY: ~/KOMPAS/scripts/check_phase.sh
+
+IMPLEMENTACIA:
+```bash
+cat > ~/KOMPAS/scripts/check_phase.sh <<'EOF'
+#!/usr/bin/env bash
+# Použitie: bash ~/KOMPAS/scripts/check_phase.sh <0-7>   alebo   ... msgs
+ROOT="$HOME/KOMPAS"
+PY="$ROOT/backend/.venv/bin/python"
+
+next_msg() {
+  case "$1" in
+    0) printf '%s\n' "FÁZA 0 schválená (nezávislá kontrola scripts/check_phase.sh 0 prešla). Pokračuj FÁZOU 1 podľa docs/OPENCODE_PROMPT.md. Povolená výnimka z pravidla 6: vytvor aj scripts/make_env.sh, ktorý z .env.example vytvorí lokálny .env s náhodne vygenerovaným tajomstvom (.env sa nikdy necommituje), a zapíš to ako ADR. Testy aj alembic musia fungovať po načítaní tohto .env. Dodrž pravidlá zo sekcie 1. Po poslednom kroku FÁZY 1 sa zastav a nepokračuj bez môjho súhlasu." ;;
+    1) printf '%s\n' "FÁZA 1 schválená (scripts/check_phase.sh 1 prešiel). Pokračuj FÁZOU 2 (migrácie a schéma), kroky 2.1 až 2.6 podľa docs/OPENCODE_PROMPT.md. Dodrž pravidlá zo sekcie 1, po každom kroku test a commit. Po kroku 2.6 sa zastav a nepokračuj bez môjho súhlasu." ;;
+    2) printf '%s\n' "FÁZA 2 schválená (scripts/check_phase.sh 2 prešiel). Pokračuj FÁZOU 3, moduly v poradí K-16, K-01, K-02, K-05, K-04, K-03. Pre každý modul postup a) až g) zo sekcie 6, každý krok s testom a commitom, modul zaregistruj v main.py a spusti celú sadu testov. Po dokončení K-03 sa zastav a nepokračuj bez môjho súhlasu." ;;
+    3) printf '%s\n' "FÁZA 3 schválená (scripts/check_phase.sh 3 prešiel). Pokračuj FÁZOU 4, moduly v poradí K-09, K-07, K-08, K-10, K-11. Pre každý modul postup a) až g) zo sekcie 6, každý krok s testom a commitom, modul zaregistruj v main.py a spusti celú sadu testov. Po dokončení K-11 sa zastav a nepokračuj bez môjho súhlasu." ;;
+    4) printf '%s\n' "FÁZA 4 schválená (scripts/check_phase.sh 4 prešiel). Pokračuj FÁZOU 5, moduly v poradí K-12, K-13, K-14, K-15, K-06. Pre každý modul postup a) až g) zo sekcie 6, každý krok s testom a commitom, modul zaregistruj v main.py a spusti celú sadu testov. Po dokončení K-06 sa zastav a nepokračuj bez môjho súhlasu." ;;
+    5) printf '%s\n' "FÁZA 5 schválená (scripts/check_phase.sh 5 prešiel). Pokračuj FÁZOU 6 (frontend), kroky 6.1 až 6.10. Ak chýba node alebo npm, zastav sa a nahlás to, nepreskakuj. Po kroku 6.10 sa zastav a nepokračuj bez môjho súhlasu." ;;
+    6) printf '%s\n' "FÁZA 6 schválená (scripts/check_phase.sh 6 prešiel). Pokračuj FÁZOU 7 (integrácia, dokumentácia a záver), kroky 7.1 až 7.8. Report docs/REPORT_FAZA_7.md musí obsahovať skutočné výpisy a otvorené rozhodnutia bez prikrášľovania. Po kroku 7.8 sa zastav." ;;
+    7) printf '%s\n' "FÁZA 7 schválená (scripts/check_phase.sh 7 prešiel). Nerob žiadne ďalšie zmeny. Vypíš iba výstup git log --oneline | head -5 a zoznam otvorených rozhodnutí z docs/REPORT_FAZA_7.md." ;;
+  esac
+}
+
+N="${1:-}"
+if [ "$N" = "msgs" ]; then
+  for i in 0 1 2 3 4 5 6 7; do echo "=== schválenie FÁZY $i ==="; next_msg "$i"; echo; done
+  echo "=== ak sa OpenCode zastavil uprostred fázy ==="
+  echo "Pokračuj tam, kde si skončil, v rámci aktuálnej fázy podľa docs/OPENCODE_PROMPT.md. Najprv vypíš git log --oneline | head -5 a výsledok testov, potom pokračuj ďalším krokom. Dodrž pravidlá zo sekcie 1."
+  echo
+  echo "=== ak začínaš novú reláciu OpenCode ==="
+  echo "Prečítaj celý docs/OPENCODE_PROMPT.md. Spusti git log --oneline | head -20 a zisti posledný dokončený krok. Pokračuj ďalším krokom v rámci tej istej fázy. Nezačínaj od začiatku a neprepisuj hotové súbory."
+  exit 0
+fi
+case "$N" in [0-7]) ;; *) echo "Použitie: check_phase.sh <0-7> | msgs"; exit 2;; esac
+
+cd "$ROOT" || exit 2
+mkdir -p "$ROOT/.data/check"
+if [ -f "$ROOT/.env" ]; then set -a; . "$ROOT/.env"; set +a; fi
+
+FAILS=0
+FAILED_LIST=""
+ok()   { echo "OK            $1"; }
+warn() { echo "UPOZORNENIE  $1"; }
+bad()  { echo "CHYBA         $1"; FAILS=$((FAILS+1)); FAILED_LIST="${FAILED_LIST}
+- $1"; }
+nonempty() { if [ -s "$ROOT/$1" ]; then ok "$1"; else bad "súbor chýba alebo je prázdny: $1"; fi; }
+
+modcheck() {
+  m="${1%%:*}"; k="${1##*:}"; b="backend/app/modules/$m"
+  for f in domain/models.py repository/repository.py services/service.py events/handlers.py api/router.py tests/test_service.py; do
+    nonempty "$b/$f"
+  done
+  nonempty "docs/modules/$k.md"
+  if grep -q "$m" backend/app/main.py 2>/dev/null; then ok "$m je spomenutý v main.py"; else warn "$m sa nenašiel v main.py (over registráciu modulu)"; fi
+  if [ "$m" = "k16_intelligent_core" ]; then
+    for p in orchestrator knowledge_system context_memory rule_system analytics_engine audit_engine; do
+      nonempty "$b/$p/service.py"
+    done
+  fi
+}
+
+ph0() {
+  nonempty docs/BASELINE.md
+  nonempty .gitignore
+  nonempty backend/requirements.txt
+  if grep -q '^\.env$' .gitignore 2>/dev/null; then ok ".gitignore obsahuje .env"; else bad ".gitignore neobsahuje riadok .env"; fi
+  if [ "$(git rev-list --count HEAD 2>/dev/null || echo 0)" -ge 1 ]; then ok "git repozitár má aspoň jeden commit"; else bad "git repozitár neexistuje alebo nemá commit"; fi
+  if [ -x "$PY" ]; then ok "backend/.venv existuje"; else bad "backend/.venv chýba"; fi
+  if [ -x "$PY" ] && "$PY" -c "import fastapi, sqlalchemy, alembic, pydantic, pytest, httpx" 2>/dev/null; then ok "základné závislosti sa dajú importovať"; else bad "základné závislosti sa nedajú importovať"; fi
+  C=$(ls docs/adr 2>/dev/null | wc -l)
+  if [ "$C" -ge 8 ]; then ok "docs/adr má $C súborov"; else warn "docs/adr má iba $C súborov (očakávaných 8 pre D1-D7 a 0001)"; fi
+}
+ph1() {
+  for f in backend/app/core/config/settings.py backend/app/core/database/session.py backend/app/core/security/auth.py backend/app/core/security/routes.py backend/app/core/events/bus.py backend/app/core/audit/logger.py backend/app/core/permissions/policy.py backend/app/shared/types.py backend/app/shared/identity.py backend/app/shared/school.py backend/app/shared/curriculum.py backend/app/main.py .env.example; do nonempty "$f"; done
+}
+ph2() {
+  for f in backend/alembic.ini db/migrations/env.py scripts/export_schema.py scripts/run_dev.sh; do nonempty "$f"; done
+  for d in identity school curriculum learning progress teacher_workspace organization communication ai_knowledge audit; do nonempty "db/schema/$d.sql"; done
+  V=$(ls db/migrations/versions/*.py 2>/dev/null | wc -l)
+  if [ "$V" -ge 1 ]; then ok "migrácie vo versions: $V"; else bad "db/migrations/versions neobsahuje žiadnu migráciu"; fi
+}
+ph3() { for x in k16_intelligent_core:K-16 k01_learning_profile:K-01 k02_subject_workspace:K-02 k05_knowledge_continuity:K-05 k04_missions:K-04 k03_adaptive_learning:K-03; do modcheck "$x"; done; }
+ph4() { for x in k09_class_overview:K-09 k07_professional_library:K-07 k08_work_assistant:K-08 k10_organization_center:K-10 k11_operations_center:K-11; do modcheck "$x"; done; }
+ph5() { for x in k12_analytics_center:K-12 k13_parent_center:K-13 k14_communication_center:K-14 k15_collaboration_projects:K-15 k06_virtual_lab:K-06; do modcheck "$x"; done; }
+ph6() {
+  for f in frontend/package.json frontend/tsconfig.json frontend/src/app/layout.tsx frontend/src/app/page.tsx frontend/src/app/student/page.tsx frontend/src/app/teacher/page.tsx frontend/src/app/leadership/page.tsx frontend/src/app/parent/page.tsx frontend/src/lib/api.ts scripts/sync_locales.sh locales/sk/common.json locales/en/common.json; do nonempty "$f"; done
+  for j in frontend/package.json locales/sk/common.json locales/en/common.json; do
+    if python3 -c "import json,sys; json.load(open('$ROOT/$j'))" 2>/dev/null; then ok "platný JSON: $j"; else bad "neplatný JSON: $j"; fi
+  done
+  E=$(find tests/e2e frontend/tests -type f ! -name '.gitkeep' 2>/dev/null | wc -l)
+  if [ "$E" -ge 1 ]; then ok "e2e alebo frontend testy: $E súborov"; else warn "žiadne e2e ani frontend testy (OpenCode to musí zdôvodniť v reporte)"; fi
+}
+ph7() {
+  for x in k01_learning_profile:K-01 k02_subject_workspace:K-02 k03_adaptive_learning:K-03 k04_missions:K-04 k05_knowledge_continuity:K-05 k06_virtual_lab:K-06 k07_professional_library:K-07 k08_work_assistant:K-08 k09_class_overview:K-09 k10_organization_center:K-10 k11_operations_center:K-11 k12_analytics_center:K-12 k13_parent_center:K-13 k14_communication_center:K-14 k15_collaboration_projects:K-15 k16_intelligent_core:K-16; do modcheck "$x"; done
+  for f in docs/REPORT_FAZA_7.md README.md scripts/seed_demo.py; do nonempty "$f"; done
+  for d in api-contracts events permissions data-model; do
+    X=$(find "docs/$d" -type f ! -name 'README.md' 2>/dev/null | wc -l)
+    if [ "$X" -ge 1 ]; then ok "docs/$d obsahuje vygenerovaný obsah"; else warn "docs/$d obsahuje iba README.md"; fi
+  done
+  if git ls-files 2>/dev/null | grep -Eq '(^|/)\.env$'; then bad "súbor .env je v gite"; else ok ".env nie je v gite"; fi
+  if grep -rInE "(sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |EC )?PRIVATE KEY)" --exclude-dir=.venv --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude-dir=.data . >/dev/null 2>&1; then bad "nájdený podozrivý reťazec tajomstva"; else ok "žiadne očividné tajomstvá"; fi
+  if python3 - <<'PYEOF'
+import os, sys
+root = os.path.expanduser('~/KOMPAS')
+skip = {'.git', '.venv', 'node_modules', '.next', '__pycache__', '.data'}
+exts = ('.py', '.md', '.ts', '.tsx', '.json', '.sql', '.sh', '.txt', '.toml', '.ini', '.example', '.css')
+hits = []
+for d, ds, fs in os.walk(root):
+    ds[:] = [x for x in ds if x not in skip]
+    for f in fs:
+        if f.endswith(exts):
+            p = os.path.join(d, f)
+            try:
+                t = open(p, encoding='utf-8', errors='ignore').read()
+            except OSError:
+                continue
+            if any(0x1F300 <= ord(c) <= 0x1FAFF for c in t):
+                hits.append(p)
+for h in hits:
+    print('emoji v: ' + h)
+sys.exit(1 if hits else 0)
+PYEOF
+  then ok "žiadne emoji"; else bad "nájdené emoji (výpis vyššie)"; fi
+}
+
+for i in $(seq 0 "$N"); do
+  echo "--- kontrola súborov FÁZY $i ---"
+  "ph$i"
+done
+
+if [ "$N" -ge 1 ]; then
+  echo "--- syntax a testy ---"
+  if [ -x "$PY" ]; then
+    if find backend/app tests -name '*.py' -exec "$PY" -m py_compile {} + 2>"$ROOT/.data/check/compile.log"; then ok "py_compile všetkých .py"; else bad "py_compile zlyhal"; tail -10 "$ROOT/.data/check/compile.log"; fi
+    OUT=$(cd "$ROOT/backend" && "$PY" -m pytest -q -p no:cacheprovider . ../tests 2>&1); RC=$?
+    echo "$OUT" | tail -15
+    if [ "$RC" -eq 0 ]; then ok "pytest prešiel"; else bad "pytest zlyhal (návratový kód $RC; 5 znamená, že sa nenašiel žiadny test)"; fi
+  else
+    bad "nemožno spustiť testy, chýba backend/.venv"
+  fi
+fi
+
+if [ "$N" -ge 2 ] && [ -x "$PY" ]; then
+  echo "--- cyklus migrácií ---"
+  TMPDB="$ROOT/.data/check/migr_check.db"; rm -f "$TMPDB"
+  LOG="$ROOT/.data/check/alembic.log"
+  if ( cd "$ROOT/backend" && export DATABASE_URL="sqlite:///$TMPDB" && "$PY" -m alembic upgrade head && "$PY" -m alembic downgrade base && "$PY" -m alembic upgrade head ) >"$LOG" 2>&1; then ok "alembic upgrade, downgrade, upgrade"; else bad "alembic cyklus zlyhal"; tail -15 "$LOG"; fi
+  rm -f "$TMPDB"
+fi
+
+if [ "$N" -ge 6 ]; then
+  echo "--- build frontendu ---"
+  LOG="$ROOT/.data/check/npm_build.log"
+  if command -v npm >/dev/null 2>&1; then
+    if ( cd "$ROOT/frontend" && npm run build ) >"$LOG" 2>&1; then ok "npm run build"; else bad "npm run build zlyhal"; tail -15 "$LOG"; fi
+  else
+    bad "npm nie je nainštalovaný"
+  fi
+fi
+
+echo "--- stav gitu ---"
+git log --oneline 2>/dev/null | head -5
+if [ -n "$(git status --short 2>/dev/null)" ]; then warn "pracovný strom má necommitnuté zmeny"; fi
+
+echo
+if [ "$FAILS" -eq 0 ]; then
+  echo "VÝSLEDOK: FÁZA $N je v poriadku, môžeš schváliť."
+  echo "----- VLOŽ DO OPENCODE -----"
+  next_msg "$N"
+else
+  echo "VÝSLEDOK: FÁZA $N NIE JE v poriadku, počet chýb: $FAILS."
+  echo "----- VLOŽ DO OPENCODE -----"
+  echo "FÁZA $N neschválená. Nezávislá kontrola scripts/check_phase.sh $N našla tieto chyby:${FAILED_LIST}"
+  echo "Oprav presne tieto chyby, po každej oprave spusti testy a pošli nový report. Testy neoslabuj ani nemaž, aby prešli. Nepokračuj do ďalšej fázy."
+fi
+EOF
+bash -n ~/KOMPAS/scripts/check_phase.sh && echo "SYNTAX OK" || echo "SYNTAX ERROR"
+bash ~/KOMPAS/scripts/check_phase.sh 9; echo "KOD $?"
+bash ~/KOMPAS/scripts/check_phase.sh msgs | head -5
+```
+
+VYSLEDOK (očakávaný, nespustený):
+SYNTAX OK
+Použitie: check_phase.sh <0-7> | msgs
+KOD 2
+=== schválenie FÁZY 0 ===
+(prvá správa pre OpenCode)
+
+PRICINA: Nemáš ma k dispozícii na ďalšie odpovede, takže overenie fázy aj text ďalšieho pokynu musia byť v súbore. Skript nezávisí od toho, čo OpenCode tvrdí v reporte.
+INE MOZNOSTI: Ručné príkazy po každej fáze, ako som uviedol predtým, boli zamietnuté, lebo by si musel sám posúdiť výpisy. Spoliehanie sa na report OpenCode bolo zamietnuté z rovnakého dôvodu.
+RIZIKA:
+- Skript neviem, ako presne OpenCode pomenuje premenné prostredia a nastaví cesty importu pre pytest a alembic. Ak kontrola zlyhá kvôli tomu, ide o chybu konfigurácie, nie nutne kódu. Chybu uvidíš vo výpise a správa na opravu ju pošle OpenCode.
+- Kontrola súborov pozná iba neprázdnosť, nie kvalitu. Kvalitu kryjú testy. Preto skript pri neprázdnom, ale triviálnom teste nezasiahne.
+- Ak OpenCode vytvorí `.env` s hodnotami obsahujúcimi medzery bez úvodzoviek, načítanie v skripte zlyhá. Na to je určená výnimka `make_env.sh` v správe po FÁZE 0.
+
+POSTUP PRE KAŽDÚ FÁZU (v druhej relácii Termuxu):
+1. Počkaj, kým sa OpenCode zastaví po poslednom kroku fázy.
+2. Spusti `bash ~/KOMPAS/scripts/check_phase.sh N` (N je číslo práve dokončenej fázy, 0 až 7).
+3. Všetko pod riadkom `----- VLOŽ DO OPENCODE -----` skopíruj do OpenCode a odošli.
+4. Fázy 0 až 7 opakuj po jednej. Skript na FÁZE N kontroluje aj fázy 0 až N-1, takže zachytí regresiu.
+
+Dve ďalšie situácie:
+- Ak sa OpenCode zastaví uprostred fázy (otázka, chyba, vyčerpaný kontext), spusti `bash ~/KOMPAS/scripts/check_phase.sh msgs` a použi sekciu "ak sa OpenCode zastavil uprostred fázy" alebo "ak začínaš novú reláciu OpenCode". Obe sú v rovnakom výpise.
+- Ak sa OpenCode opýta na otvorené rozhodnutie z prompt (ročníky, zariadenia, AI, nasadenie), odpovedz: `Ponechaj konfiguráciu a rozhodnutie nechaj otvorené. Pokračuj podľa docs/OPENCODE_PROMPT.md.`
+
+Po FÁZE 0 odporúčam `cd ~/KOMPAS && git add scripts/check_phase.sh && git commit -m "Pridany overovaci skript"`, aby skript neostal medzi necommitnutými zmenami. Skript to len hlási ako upozornenie, nezlyhá kvôli tomu.
+
+
+
+
+
+Nič nie je pokazené. OpenCode sa zastavil presne podľa pravidiel, lebo balík `pydantic` obsahuje natívnu časť (`pydantic-core`), ktorú pip v Termuxe nemá hotovú a musí ju kompilovať z Rust zdrojov. To trvá minúty, ale OpenCode používa príkaz s limitom 30 sekúnd (`timeout 30`), ktorý kompiláciu zabil. Nevadí, že sa mu to nepodarilo, vadí iba nevhodný spôsob. Kompiláciu spustíš ty sám v Termuxe, kde limit nie je.
+
+Z jeho výpisu ešte vidím, že `psql` 18.6 a Redis v Termuxe sú, takže PostgreSQL bude neskôr možný. Pre FÁZU 0 to nemení nič. Systémový `sqlite3` CLI nefunguje, Python knižnica `sqlite3` áno, takže SQLite pre vývoj (rozhodnutie D1) ostáva v platnosti.
+
+KROK 1: Skript na inštaláciu závislostí
+POPIS: Skript doinštaluje Rust (ak chýba), nastaví premennú potrebnú na zostavenie pre Android a nainštaluje balíky po jednom, takže vidíš, ktorý uspel a ktorý nie. Beží na pozadí s logom.
+SUBORY: ~/KOMPAS/scripts/install_deps.sh
+
+IMPLEMENTACIA:
+```bash
+cat > ~/KOMPAS/scripts/install_deps.sh <<'EOF'
+#!/usr/bin/env bash
+set -u
+cd "$HOME/KOMPAS/backend" || exit 2
+. .venv/bin/activate || { echo "CHYBA: chýba backend/.venv"; exit 2; }
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "Inštalujem rust a binutils cez pkg"
+  pkg install -y rust binutils || { echo "CHYBA: pkg install rust zlyhal"; exit 3; }
+fi
+export ANDROID_API_LEVEL="$(getprop ro.build.version.sdk)"
+export CARGO_BUILD_JOBS=2
+echo "ANDROID_API_LEVEL=$ANDROID_API_LEVEL"
+echo "cargo: $(cargo --version 2>&1)"
+
+FAILED=""
+for p in pydantic pydantic-settings fastapi uvicorn sqlalchemy alembic httpx pytest PyJWT argon2-cffi; do
+  echo "=== $p ==="
+  if pip install "$p"; then echo "VYSLEDOK $p OK"; else echo "VYSLEDOK $p ZLYHAL"; FAILED="$FAILED $p"; fi
+done
+
+echo
+python -c "import fastapi, sqlalchemy, alembic, pydantic, pytest, httpx, jwt, argon2; print('core ok')" 2>&1
+if [ -n "$FAILED" ]; then echo "ZLYHALI:$FAILED"; else echo "VSETKO NAINSTALOVANE"; fi
+echo "KONIEC SKRIPTU"
+EOF
+bash -n ~/KOMPAS/scripts/install_deps.sh && echo "SYNTAX OK" || echo "SYNTAX ERROR"
+```
+
+VYSLEDOK (očakávaný, nespustený):
+SYNTAX OK
+
+KROK 2: Spustenie na pozadí a sledovanie
+POPIS: Kompilácia pydantic-core môže trvať 10 až 30 minút. Beží na pozadí, aby ju nezabil žiadny limit.
+SUBORY: ~/KOMPAS/.data/install.log (log, mimo gitu)
+
+IMPLEMENTACIA:
+```bash
+mkdir -p ~/KOMPAS/.data
+termux-wake-lock 2>/dev/null
+nohup bash ~/KOMPAS/scripts/install_deps.sh > ~/KOMPAS/.data/install.log 2>&1 &
+sleep 5; tail -n 5 ~/KOMPAS/.data/install.log
+```
+
+Priebeh sleduj príkazom `tail -f ~/KOMPAS/.data/install.log` (ukončenie Ctrl+C). Hotovo je, keď sa v logu objaví riadok `KONIEC SKRIPTU`. Počas kompilácie nechaj Termux otvorený a telefón nabíjaný, Android môže aplikáciu uspať.
+
+KROK 3: Overenie
+POPIS: Kontrola, či sú všetky balíky importovateľné a čo sa nainštalovalo.
+SUBORY: žiadne
+
+IMPLEMENTACIA:
+```bash
+grep -E "^VYSLEDOK|^core ok|^ZLYHALI|^VSETKO|^CHYBA" ~/KOMPAS/.data/install.log
+~/KOMPAS/backend/.venv/bin/python -c "import fastapi, sqlalchemy, alembic, pydantic, pytest, httpx, jwt, argon2; print('IMPORT OK')" 2>&1
+```
+
+VYSLEDOK (očakávaný): desať riadkov `VYSLEDOK <balík> OK`, `core ok`, `VSETKO NAINSTALOVANE`, `IMPORT OK`.
+
+Čo urobiť podľa výsledku:
+
+- Ak je všetko OK, vlož do OpenCode túto správu:
+
+  Závislosti som nainštaloval sám mimo OpenCode skriptom scripts/install_deps.sh, import všetkých základných balíkov prešiel. Žiadny príkaz, ktorý trvá dlhšie ako 30 sekúnd, nespúšťaj priamo, spúšťaj ho na pozadí cez nohup s logom a sleduj log. Pre D5 použi PyJWT a argon2-cffi, nepoužívaj python-jose ani passlib (sú slabo udržiavané, v ADR to zapíš ako spresnenie D5). Urob medzicommit s .gitignore. Potom dokonči krok 0.5 (pip freeze do backend/requirements.txt s pripnutými verziami), krok 0.6 (docs/BASELINE.md, ADR D1 až D7, baseline commit) a zastav sa.
+
+  Potom spusti `bash ~/KOMPAS/scripts/check_phase.sh 0` a pokračuj podľa jeho výstupu.
+
+- Ak niektorý balík zlyhal (riadok `ZLYHAL`), pošli mi posledné riadky logu, ak ma ešte máš k dispozícii:
+  ```bash
+  tail -n 40 ~/KOMPAS/.data/install.log
+  ```
+  Ak ma nemáš, vlož ich do OpenCode so správou: "Inštalácia balíka [názov] zlyhala, presný výpis je nižšie. Nenahrádzaj ho vlastnou implementáciou. Zisti príčinu, navrhni overenú alternatívu a zastav sa na moje rozhodnutie."
+
+PRICINA: Zlyhanie bolo spôsobené časovým limitom nástroja, nie projektom. Kompilácia mimo OpenCode je najspoľahlivejšia a zároveň nevyžaduje, aby si mu odpovedal na rozhodnutie z jeho možností 1 až 4.
+INE MOZNOSTI:
+- Pydantic verzie 1: zamietnuté, nové FastAPI očakáva verziu 2 a zmena by ovplyvnila celý návrh.
+- Hľadanie hotového wheelu: neviem, či existuje pre Python 3.14 na Androide, a hľadanie by trvalo dlhšie ako samotná kompilácia.
+- Nižšia verzia Pythonu: zamietnuté, v Termuxe sa nedá bez ďalšej inštalácie.
+RIZIKA:
+- Kompilácia môže zlyhať na nedostatku pamäte. Preto `CARGO_BUILD_JOBS=2`. Ak zlyhá aj tak, výsledok bude v logu.
+- Výber PyJWT a argon2-cffi namiesto python-jose a passlib je moje odporúčanie. Ich fungovanie na Python 3.14 som neoveroval, overí to krok 3.
+- Rust verziu a ďalšie závislosti inštaluje `pkg`, jeho aktuálne verzie nepoznám. Skript vypíše verziu cargo na začiatku logu.
+
+
+
+
+
+Inštalácia prešla pre všetkých desať balíkov, nefunguje iba jeden binárny súbor. PyJWT pri importe načíta knižnicu `cryptography`, ktorú nainštaloval OpenCode ešte pred mojím skriptom (ako závislosť `python-jose[cryptography]`). Jej natívna časť sa na Androide nedá načítať, chýba jej väzba na `libpython`, preto chyba `cannot locate symbol "PyBaseObject_Type"`. To je moja pravdepodobná príčina, nie overené zistenie. Podporuje ju jedno: importy `fastapi`, `pydantic`, `sqlalchemy`, `alembic`, `pytest` a `httpx` prešli, spadol až `jwt`.
+
+Nie je to blokujúce. PyJWT funguje aj bez `cryptography`, ak sa podpisuje symetricky (algoritmus HS256, jedno tajomstvo na backende), čo pre modulárny monolit stačí. Asymetrické algoritmy (RS256, ES256) by `cryptography` vyžadovali, ale zatiaľ nič v návrhu nie je.
+
+KROK 1: Odstránenie nefunkčného `cryptography` a súvisiacich balíkov
+POPIS: Odinštaluje sa `python-jose` (už ho nepotrebujeme, D5 používa PyJWT) a jeho závislosti. `cffi` a `pycparser` ostanú, potrebuje ich `argon2-cffi`.
+SUBORY: žiadne (iba balíky vo venv)
+
+IMPLEMENTACIA:
+```bash
+cd ~/KOMPAS/backend && . .venv/bin/activate
+pip uninstall -y python-jose cryptography rsa ecdsa pyasn1 2>&1 | tail -8
+pip list 2>&1 | grep -iE "cryptography|jose|^rsa|ecdsa|pyasn1|cffi|PyJWT|argon2" 
+```
+
+VYSLEDOK (očakávaný): zoznam bude obsahovať `cffi`, `pycparser`, `PyJWT`, `argon2-cffi`, `argon2-cffi-bindings` a už nie `cryptography`, `python-jose`, `rsa`, `ecdsa`, `pyasn1`.
+
+KROK 2: Test PyJWT a argon2
+POPIS: Overí sa import všetkých balíkov aj reálne vydanie a overenie tokenu a hash hesla.
+SUBORY: žiadne
+
+IMPLEMENTACIA:
+```bash
+cd ~/KOMPAS/backend && . .venv/bin/activate
+python - <<'PYEOF'
+import fastapi, sqlalchemy, alembic, pydantic, pytest, httpx, jwt, argon2
+key = "k" * 32
+t = jwt.encode({"sub": "test"}, key, algorithm="HS256")
+print("JWT OK" if jwt.decode(t, key, algorithms=["HS256"])["sub"] == "test" else "JWT CHYBA")
+h = argon2.PasswordHasher().hash("heslo")
+print("ARGON2 OK" if argon2.PasswordHasher().verify(h, "heslo") else "ARGON2 CHYBA")
+print("IMPORT OK")
+PYEOF
+```
+
+VYSLEDOK (očakávaný):
+JWT OK
+ARGON2 OK
+IMPORT OK
+
+Ak KROK 2 stále padne na importe `jwt` (ak PyJWT 2.15.1 importuje `cryptography` bez ochrany pred jej neprítomnosťou, čo nemôžem z výpisu overiť), pošli do OpenCode správu z poslednej časti nižšie. Presne podľa výsledku vyberiem inú knižnicu až po tom, čo uvidím chybu, nie naslepo.
+
+KROK 3: Zápis pripnutých verzií
+POPIS: Zmrazenie stavu do `requirements.txt`, aby ho OpenCode nemusel hádať.
+SUBORY: ~/KOMPAS/backend/requirements.txt
+
+IMPLEMENTACIA:
+```bash
+cd ~/KOMPAS/backend && . .venv/bin/activate
+pip freeze > requirements.txt
+test -s requirements.txt && echo "SUBOR OK" || echo "SUBOR CHYBA"
+grep -ciE "cryptography|python-jose" requirements.txt
+wc -l requirements.txt
+```
+
+VYSLEDOK (očakávaný):
+SUBOR OK
+0
+(zhruba 30 až 40 riadkov)
+
+Ak druhý riadok nie je 0, krok 1 sa nevykonal úplne.
+
+PRICINA: Chyba bola v pomocnom balíku, ktorý sme nepotrebovali. Odstránenie je jednoduchšie a spoľahlivejšie než kompilácia natívnych rozšírení bez možnosti overiť výsledok.
+INE MOZNOSTI: Prekompilovať `cryptography` s `RUSTFLAGS` a linkovaním `libpython` bolo zamietnuté, neviem, ktoré flagy Rust verzia v Termuxe potrebuje, a ďalšie kompilovanie môže trvať aj 30 minút bez záruky úspechu. `pkg install python-cryptography` a venv so systémovými balíkmi bolo zamietnuté, miešanie systémových balíkov s venv je krehké a zmení rozhodnutie z fázy 0. Vlastná implementácia HMAC podpisu bola zamietnutá podľa pravidla zákazu vlastnej kryptografie.
+RIZIKA: Bez `cryptography` nie sú dostupné asymetrické podpisy tokenov. Ak ich neskôr budeš potrebovať (napríklad pri integrácii s EduPage), bude to nový ADR. Hash hesiel (argon2) nezávisí od `cryptography`, jeho funkčnosť overí KROK 2.
+
+Po úspešných krokoch 1 až 3 vlož do OpenCode túto správu:
+
+Nezávislé overenie: cryptography sa na tomto Androide nedá načítať (dlopen: cannot locate symbol PyBaseObject_Type), preto som odinštaloval cryptography, python-jose, rsa, ecdsa a pyasn1. Balíky pre backend sú nainštalované mimo OpenCode, scripts/install_deps.sh bol spustený na pozadí, import fastapi, sqlalchemy, alembic, pydantic, pytest, httpx, jwt a argon2 prešiel, vydanie a overenie HS256 tokenu aj argon2 hash prešli. backend/requirements.txt je zmrazený podľa pip freeze. Rozhodnutia: D5 spresni v ADR takto: PyJWT iba s algoritmom HS256, argon2-cffi na heslá, cryptography, python-jose ani passlib sa nesmú inštalovať ani pridávať do requirements.txt. Každý príkaz, ktorý môže trvať viac ako 30 sekúnd, spúšťaj na pozadí cez nohup s logom, nikdy s timeout 30. Urob medzicommit s .gitignore, dokonči krok 0.5 (už hotové, iba zapíš výsledok do reportu), krok 0.6 (docs/BASELINE.md s presnými verziami z pip freeze, ADR D1 až D7, baseline commit) a zastav sa.
+
+Ak KROK 2 zlyhá, vlož namiesto toho: "KROK 2 overenia zlyhal. Presný výpis je nižšie. Nenahrádzaj knižnicu vlastnou kryptografiou a neinštaluj cryptography. Navrhni overenú alternatívu bez natívnych rozšírení, over ju importom a zastav sa na moje rozhodnutie." a pod to prilep výpis chyby.
+
+Po dokončení spusti `bash ~/KOMPAS/scripts/check_phase.sh 0` a pokračuj podľa jeho výstupu.

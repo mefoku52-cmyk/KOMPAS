@@ -48,6 +48,7 @@ class K13Service:
         notes = self.repo.get_visible_teacher_notes(school_id, child_user_id)
         payload = {
             "child_user_id": str(child_user_id),
+            "child_full_name": self.repo.get_user_full_name(child_user_id),
             "progress": progress,
             "teacher_notes": notes,
         }

@@ -80,7 +80,7 @@ def list_history(
 @router.get("/profiles/{student_user_id}/latest")
 def get_latest(
     student_user_id: uuid.UUID,
-    school_year_id: uuid.UUID,
+    school_year_id: uuid.UUID | None = None,
     purpose: str | None = None,
     class_group_id: uuid.UUID | None = None,
     teaches: bool = False,

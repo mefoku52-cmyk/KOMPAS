@@ -34,6 +34,10 @@ def test_k04_deterministic_evaluation():
     assert evaluate_answer(TaskType.CHOICE, "A", "a") is True
     assert evaluate_answer(TaskType.NUMERIC, "3.0", "3") is True
     assert evaluate_answer(TaskType.NUMERIC, "3", "x") is False
+    assert evaluate_answer(TaskType.NUMERIC, "0.75", "0,75") is True
+    assert evaluate_answer(TaskType.NUMERIC, "0.75", " 0,750 ") is True
+    assert evaluate_answer(TaskType.NUMERIC, "0.75", "0,7") is False
+    assert evaluate_answer(TaskType.NUMERIC, "1/2", "1/2") is True
     assert evaluate_answer(TaskType.TEXT_MATCH, "Bratislava", " bratislava ") is True
 
 

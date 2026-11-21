@@ -2,6 +2,15 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:80
 
 export type ApiError = { status: number; detail?: string };
 
+export type Role = "student" | "teacher" | "leadership" | "parent";
+
+export type TokenClaims = {
+  sub?: string;
+  role?: string | null;
+  school_id?: string | null;
+  exp?: number;
+};
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("access_token");
@@ -35,9 +44,6 @@ function handleAuthError(status: number) {
     clearRole();
     window.location.href = "/";
   }
-  if (status === 403) {
-    // caller can show forbidden state; keep user on page
-  }
 }
 
 export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
@@ -55,7 +61,8 @@ export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}
     let detail: string | undefined;
     try {
       const data = await res.json();
-      detail = (data && (data.detail || data.message)) as string | undefined;
+      detail =
+        (data && (data.detail || data.message || data?.error?.message_key)) || undefined;
     } catch {
       detail = res.statusText;
     }
@@ -77,14 +84,32 @@ export async function login(username: string, password: string, school_id?: stri
   });
 }
 
-export function parseRoleFromToken(token: string): string | null {
+export function parseClaims(token: string): TokenClaims | null {
   try {
     const part = token.split(".")[1];
     if (!part) return null;
     const json = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
-    const payload = JSON.parse(json) as { role?: string | null };
-    return payload.role || null;
+    return JSON.parse(json) as TokenClaims;
   } catch {
     return null;
   }
+}
+
+export function parseRoleFromToken(token: string): string | null {
+  return parseClaims(token)?.role || null;
+}
+
+export function getUserId(): string | null {
+  const token = getToken();
+  if (!token) return null;
+  return parseClaims(token)?.sub || null;
+}
+
+export function formatApiError(err: unknown, fallback: string): string {
+  if (typeof err === "object" && err !== null && "status" in err) {
+    const apiErr = err as ApiError;
+    if (apiErr.detail) return `${apiErr.detail} (${apiErr.status})`;
+    return `${fallback} (${apiErr.status})`;
+  }
+  return fallback;
 }

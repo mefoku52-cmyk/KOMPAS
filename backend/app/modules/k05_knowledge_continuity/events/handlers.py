@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 from app.core.database.session import SessionLocal
-from app.core.events.bus import DomainEvent, EventBus
+from app.core.events.bus import DomainEvent, EventBus, current_session
 from app.modules.k05_knowledge_continuity.domain.models import TopicProgressKind, TopicProgressStatus
 from app.modules.k05_knowledge_continuity.services.service import K05Service
 from app.shared.types import system_principal
+
+logger = logging.getLogger(__name__)
 
 
 def handle_answer_evaluated(event: DomainEvent) -> None:
@@ -18,7 +22,11 @@ def handle_answer_evaluated(event: DomainEvent) -> None:
     is_verification = bool(payload.get("is_verification", False))
     correct = bool(payload.get("correct", False))
     principal = system_principal()
-    db = SessionLocal()
+    # Reuse the publishing transaction when there is one: a second connection
+    # would read uncommitted state and hit the SQLite write lock.
+    shared = current_session()
+    db = shared if shared is not None else SessionLocal()
+    owns_session = shared is None
     try:
         svc = K05Service(db)
         if is_verification and correct:
@@ -45,11 +53,19 @@ def handle_answer_evaluated(event: DomainEvent) -> None:
             is_verification_evidence=ver_ev,
             purpose="answer_evaluated_event",
         )
-        db.commit()
+        if owns_session:
+            db.commit()
+        else:
+            db.flush()
     except Exception:
         db.rollback()
+        logger.exception(
+            "k05 handler failed for answer_evaluated",
+            extra={"attempt_ref": str(attempt_ref), "topic_id": str(topic_id)},
+        )
     finally:
-        db.close()
+        if owns_session:
+            db.close()
 
 
 def register(bus: EventBus) -> None:

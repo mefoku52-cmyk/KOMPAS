@@ -137,7 +137,7 @@ class K01Service:
         self,
         principal: Principal,
         student_user_id: uuid.UUID,
-        school_year_id: uuid.UUID,
+        school_year_id: uuid.UUID | None,
         school_id: uuid.UUID,
         *,
         purpose: str | None = None,
@@ -155,6 +155,10 @@ class K01Service:
             teaches=teaches,
         )
         self._authorize_or_raise(principal, action, resource, ctx, purpose=purpose)
-        row = self.repo.get_latest_for_year(student_user_id, school_year_id, school_id=school_id)
+        year_id = school_year_id or self.repo.latest_enrollment_year(student_user_id, school_id)
+        if year_id is None:
+            audit_write(self.db, principal, action, resource, purpose, "success", {"found": False, "reason": "no_enrollment"})
+            return None
+        row = self.repo.get_latest_for_year(student_user_id, year_id, school_id=school_id)
         audit_write(self.db, principal, action, resource, purpose, "success", {"found": bool(row)})
         return row

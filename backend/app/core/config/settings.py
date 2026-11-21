@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     app_name: str = Field(default="KOMPAS", alias="APP_NAME")
     app_env: str = Field(default="development", alias="APP_ENV")
     app_port: int = Field(default=8000, alias="APP_PORT")
+    # Swagger/OpenAPI. Defaultne zapnuté v development, v produkcii len ak sa povolí.
+    app_docs_enabled: bool = Field(default=False, alias="APP_DOCS_ENABLED")
 
     # Technicka predvolena hodnota, docasna - kym pouzivatel nerozhodne.
     grade_min: int = Field(default=1, alias="GRADE_MIN")

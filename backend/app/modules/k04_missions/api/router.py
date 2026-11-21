@@ -43,6 +43,22 @@ def status(principal: Principal = Depends(get_current_principal)):
     return {"module": "k04", "status": "ready"}
 
 
+@router.get("/missions")
+def list_missions(
+    school_id: uuid.UUID | None = None,
+    topic_id: uuid.UUID | None = None,
+    page: Page = Depends(page_params),
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    target = school_id or principal.school_id
+    if target is None:
+        raise HTTPException(status_code=400, detail="school_id_required")
+    rows = K04Service(db).list_missions(principal, school_id=target, topic_id=topic_id)
+    db.commit()
+    return paginated(rows, page)
+
+
 @router.post("/missions")
 def create_mission(payload: MissionCreate, principal: Principal = Depends(get_current_principal), db: Session = Depends(get_db)):
     school_id = payload.school_id or principal.school_id
@@ -75,6 +91,17 @@ def list_tasks(
     db: Session = Depends(get_db),
 ):
     rows = K04Service(db).list_tasks(principal, mission_id)
+    db.commit()
+    return paginated(rows, page)
+
+
+@router.get("/attempts/mine")
+def list_my_attempts(
+    page: Page = Depends(page_params),
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    rows = K04Service(db).list_my_attempts(principal)
     db.commit()
     return paginated(rows, page)
 

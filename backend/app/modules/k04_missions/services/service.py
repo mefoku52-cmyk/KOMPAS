@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.core.audit.logger import write as audit_write
+from app.core.api import serialize
 from app.core.events.bus import DomainEvent, EventBus, bus as default_bus
 from app.core.permissions.policy import Scope, authorize
 from app.modules.k04_missions.domain.models import TaskType
@@ -12,15 +13,22 @@ from app.modules.k04_missions.repository.repository import K04Repository
 from app.shared.types import Principal, Role
 
 
+def _normalise_number(value: str) -> str:
+    """'0,75' -> '0.75' — pupils write the decimal comma, never the dot."""
+    return str(value).strip().replace(" ", "").replace("\u00a0", "").replace(",", ".")
+
+
 def evaluate_answer(task_type: str | TaskType, expected: str, answer: str) -> bool:
     t = TaskType(task_type).value if not isinstance(task_type, TaskType) else task_type.value
     if t == TaskType.CHOICE.value:
         return str(answer).strip().lower() == str(expected).strip().lower()
     if t == TaskType.NUMERIC.value:
+        raw_answer, raw_expected = _normalise_number(answer), _normalise_number(expected)
         try:
-            return float(str(answer).strip()) == float(str(expected).strip())
+            return float(raw_answer) == float(raw_expected)
         except (TypeError, ValueError):
-            return False
+            # fractions and other non-float numerics compare as text
+            return raw_answer.casefold() == raw_expected.casefold()
     if t == TaskType.TEXT_MATCH.value:
         return str(answer).strip().casefold() == str(expected).strip().casefold()
     return False
@@ -128,3 +136,29 @@ class K04Service:
         rows = self.repo.list_tasks(mission_id)
         audit_write(self.db, principal, action, f"learning_mission:{mission_id}", None, "success", {"count": len(rows)})
         return rows
+
+    def list_missions(self, principal: Principal, *, school_id: uuid.UUID, topic_id: uuid.UUID | None = None):
+        """Missions of a school. Visible to everyone who belongs to that school."""
+        action = "k04.list_missions"
+        if not (principal.is_system or principal.school_id == school_id):
+            audit_write(self.db, principal, action, f"school:{school_id}", None, "denied", {"reason": "school_scope_denied"})
+            raise PermissionError("school_scope_denied")
+        rows = self.repo.list_missions(school_id, topic_id=topic_id)
+        audit_write(self.db, principal, action, f"school:{school_id}", None, "success", {"count": len(rows)})
+        return rows
+
+    def list_my_attempts(self, principal: Principal):
+        """The authenticated student's own submissions (answers + correctness)."""
+        action = "k04.list_my_attempts"
+        if principal.role != Role.STUDENT or principal.school_id is None:
+            audit_write(self.db, principal, action, f"student:{principal.user_id}", None, "denied", {"reason": "student_only"})
+            raise PermissionError("student_only")
+        rows = self.repo.list_student_attempts(principal.school_id, principal.user_id)
+        prompts = self.repo.task_prompts([row.task_id for row in rows])
+        result = []
+        for row in rows:
+            payload = serialize(row)
+            payload["task_prompt"] = prompts.get(row.task_id)
+            result.append(payload)
+        audit_write(self.db, principal, action, f"student:{principal.user_id}", None, "success", {"count": len(result)})
+        return result

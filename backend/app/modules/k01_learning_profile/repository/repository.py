@@ -56,6 +56,15 @@ class K01Repository:
         stmt = stmt.order_by(StudentLearningProfile.version.asc())
         return list(self.db.execute(stmt).scalars().all())
 
+    def latest_enrollment_year(self, student_user_id: uuid.UUID, school_id: Optional[uuid.UUID] = None) -> Optional[uuid.UUID]:
+        from app.shared.school import Enrollment
+
+        stmt = select(Enrollment.school_year_id).where(Enrollment.student_user_id == student_user_id)
+        if school_id is not None:
+            stmt = stmt.where(Enrollment.school_id == school_id)
+        stmt = stmt.order_by(Enrollment.valid_from.desc())
+        return self.db.execute(stmt).scalars().first()
+
     def get_latest_for_year(
         self, student_user_id: uuid.UUID, school_year_id: uuid.UUID, school_id: Optional[uuid.UUID] = None
     ) -> Optional[StudentLearningProfile]:

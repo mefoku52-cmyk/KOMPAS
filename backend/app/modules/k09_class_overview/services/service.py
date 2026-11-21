@@ -63,6 +63,15 @@ class K09Service:
             raise PermissionError(decision.reason)
         return ctx
 
+    def list_my_classes(self, principal: Principal, *, school_id: uuid.UUID) -> list[dict]:
+        action = "k09.list_classes"
+        if not principal.is_system and principal.role != Role.TEACHER:
+            audit_write(self.db, principal, action, "school_class_group:list", None, "denied", {"reason": "teacher_only"})
+            raise PermissionError("teacher_only")
+        classes = self.repo.list_classes_for_teacher(school_id, principal.user_id)
+        audit_write(self.db, principal, action, "school_class_group:list", None, "success", {"count": len(classes)})
+        return classes
+
     def get_class_overview(self, principal: Principal, *, school_id: uuid.UUID, class_group_id: uuid.UUID, topic_id: uuid.UUID | None = None):
         action = "k09.get_class_overview"
         resource = f"school_class_group:{class_group_id}"

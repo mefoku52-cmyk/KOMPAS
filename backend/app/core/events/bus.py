@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections import defaultdict
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
@@ -37,6 +38,8 @@ class EventLog(Base):
 
 Handler = Callable[[DomainEvent], None]
 
+_current_session: ContextVar[Optional[Session]] = ContextVar("event_bus_session", default=None)
+
 
 class EventBus:
     def __init__(self) -> None:
@@ -46,7 +49,22 @@ class EventBus:
         self._handlers[event_type].append(handler)
 
     def publish(self, event: DomainEvent, db: Optional[Session] = None) -> None:
+        """Persist the event and dispatch handlers synchronously.
+
+        When a session is given, handlers receive that same session through
+        ``current_session()``. A handler that opens its own session instead
+        would read uncommitted state and (on SQLite) block on the write lock,
+        because the caller's transaction still holds it.
+        """
         self._persist(event, db)
+        token = _current_session.set(db) if db is not None else None
+        try:
+            self.dispatch(event)
+        finally:
+            if token is not None:
+                _current_session.reset(token)
+
+    def dispatch(self, event: DomainEvent) -> None:
         for handler in list(self._handlers.get(event.event_type, [])):
             try:
                 handler(event)
@@ -79,3 +97,8 @@ class EventBus:
 
 
 bus = EventBus()
+
+
+def current_session() -> Optional[Session]:
+    """Session of the transaction that is publishing an event, if any."""
+    return _current_session.get()

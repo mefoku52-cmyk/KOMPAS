@@ -18,6 +18,22 @@ def status(principal: Principal = Depends(get_current_principal)):
     return {"module": "k09", "status": "ready"}
 
 
+@router.get("/classes")
+def list_classes(
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    school_id = principal.school_id
+    if school_id is None:
+        raise HTTPException(status_code=400, detail="school_id_required")
+    try:
+        items = K09Service(db).list_my_classes(principal, school_id=school_id)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="forbidden")
+    db.commit()
+    return {"items": items, "total": len(items)}
+
+
 @router.get("/classes/{class_group_id}/overview")
 def class_overview(
     class_group_id: uuid.UUID,

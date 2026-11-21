@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database.session import Base
 from app.modules.k12_analytics_center.domain.models import AnalyticsAggregateSnapshot
+from app.shared.progress import resolve_effective_states, status_value
 from app.shared.school import Enrollment
 
 
@@ -30,13 +31,7 @@ class K12Repository:
                 return []
             stmt = stmt.where(table.c.student_user_id.in_(student_user_ids))
         rows = self.db.execute(stmt).all()
-        latest: dict[tuple[Any, Any], Any] = {}
-        for r in rows:
-            key = (r.student_user_id, r.topic_id)
-            prev = latest.get(key)
-            if prev is None or (r.valid_from, r.version) > (prev.valid_from, prev.version):
-                latest[key] = r
-        return list(latest.values())
+        return list(resolve_effective_states(rows, key=lambda r: (r.student_user_id, r.topic_id)).values())
 
     def aggregate_school(self, school_id: uuid.UUID) -> dict[str, Any]:
         student_ids = set(self.list_student_ids_in_school(school_id))
@@ -45,8 +40,8 @@ class K12Repository:
         by_kind: dict[str, int] = defaultdict(int)
         by_topic: dict[str, int] = defaultdict(int)
         for r in rows:
-            status = getattr(r.status, "value", r.status)
-            kind = getattr(r.kind, "value", r.kind)
+            status = status_value(r.status)
+            kind = status_value(r.kind)
             by_status[str(status)] += 1
             by_kind[str(kind)] += 1
             by_topic[str(r.topic_id)] += 1

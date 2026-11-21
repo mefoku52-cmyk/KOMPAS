@@ -7,9 +7,22 @@ from app.core.events.bus import bus
 from app.core.privacy import router as privacy_router
 from app.core.security.routes import router as auth_router
 
+# Model registration: not every module imports its ORM models on startup. Without
+# these imports Base.metadata misses tables that permission checks and serializers
+# rely on (k09 teacher-of-class lookup, curriculum topic names in k04 missions).
+import app.shared.curriculum  # noqa: F401,E402
+import app.modules.k09_class_overview.domain.models  # noqa: F401,E402
+
+
+def _docs_enabled() -> bool:
+    # Swagger is a development aid; production stays closed unless explicitly enabled.
+    return settings.app_docs_enabled or settings.app_env != "production"
+
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.app_name, docs_url=None, redoc_url=None, openapi_url=None)
+    docs = "/docs" if _docs_enabled() else None
+    openapi = "/openapi.json" if _docs_enabled() else None
+    app = FastAPI(title=settings.app_name, docs_url=docs, redoc_url=None, openapi_url=openapi)
     install_error_handlers(app)
     app.add_middleware(
         CORSMiddleware,
