@@ -74,3 +74,7 @@ def on_AnswerEvaluated(event: DomainEvent) -> None:
         # Uzatvorenie session iba ak sme ju my vytvorili
         if close_session and db is not None:
             db.close()
+
+
+def register(bus) -> None:
+    bus.subscribe("AnswerEvaluated", on_AnswerEvaluated)
