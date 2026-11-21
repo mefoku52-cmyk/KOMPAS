@@ -301,3 +301,47 @@ def test_purge_old_observations_is_idempotent(db_session):
     assert first >= 1
     second = purge_old_observations(db_session)
     assert second == 0
+
+
+def test_student_state_hidden_from_student(db_session):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security.auth import get_current_principal
+    from app.core.permissions.policy import Principal
+    from app.shared.types import Role
+    import uuid
+
+    client = TestClient(app)
+    student_id = uuid.uuid4()
+
+    def override():
+        return Principal(user_id=student_id, role=Role.STUDENT, school_id=uuid.uuid4())
+
+    app.dependency_overrides[get_current_principal] = override
+    try:
+        response = client.get(f"/k17/wellbeing/students/{student_id}/state")
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_student_state_hidden_from_parent(db_session):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security.auth import get_current_principal
+    from app.core.permissions.policy import Principal
+    from app.shared.types import Role
+    import uuid
+
+    client = TestClient(app)
+    student_id = uuid.uuid4()
+
+    def override():
+        return Principal(user_id=uuid.uuid4(), role=Role.PARENT, school_id=uuid.uuid4())
+
+    app.dependency_overrides[get_current_principal] = override
+    try:
+        response = client.get(f"/k17/wellbeing/students/{student_id}/state")
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
+    finally:
+        app.dependency_overrides.clear()

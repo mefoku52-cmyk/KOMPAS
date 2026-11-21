@@ -19,12 +19,58 @@ async def get_status():
     }
 
 @router.get("/students/{student_id}/state")
-async def get_student_state(student_id: str, db: Session = Depends(get_db)):
+async def get_student_state(
+    student_id: str,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
     """
-    Vrátí aktuálny odhadovaný psychický stav žiaka na základe pozorovaní.
-    Neobsahuje hodnotenie, iba objektívne metriky (napr. tempo, pauzy).
+    Stav ziaka je interny signal pre ucitela/vedenie. Ziak a rodic ho nevidia.
     """
-    # Implementácia bude volať WellbeingService.get_current_state
+    import uuid
+    try:
+        student_uuid = uuid.UUID(student_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_student_id")
+
+    if principal.user_id == student_uuid:
+        raise HTTPException(status_code=403, detail="student_cannot_view_state")
+    if principal.role and principal.role.value == "parent":
+        raise HTTPException(status_code=403, detail="parent_cannot_view_state")
+    if principal.role and principal.role.value == "teacher":
+        from sqlalchemy import select
+        from app.core.database.session import Base
+        from app.shared.school import Enrollment
+        table = Base.metadata.tables.get("school_class_teacher")
+        enrollments = db.execute(
+            select(Enrollment).where(
+                Enrollment.student_user_id == student_uuid,
+                Enrollment.school_id == principal.school_id,
+            )
+        ).scalars().all()
+        teaches = False
+        if enrollments and table is not None:
+            for enr in enrollments:
+                row = db.execute(
+                    select(table.c.id).where(
+                        table.c.school_id == principal.school_id,
+                        table.c.class_group_id == enr.class_group_id,
+                        table.c.teacher_user_id == principal.user_id,
+                    )
+                ).first()
+                if row is not None:
+                    teaches = True
+                    break
+        if not teaches:
+            raise HTTPException(status_code=403, detail="not_teacher_of_student")
+    elif principal.role and principal.role.value == "leadership":
+        pass
+    else:
+        raise HTTPException(status_code=403, detail="insufficient_permissions")
+
+    from app.core.audit.logger import write as audit_write
+    audit_write(db, principal, "k17.get_student_state", f"k17_wellbeing_observation:student:{student_uuid}", None, "success", {})
+
     return {"student_id": student_id, "state": "neutral", "indicators": []}
 
 @router.post("/students/{student_id}/intervention")
