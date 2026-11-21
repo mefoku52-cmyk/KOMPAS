@@ -80,11 +80,9 @@ class WellbeingAnalyticService:
         # Predvolený stav: Neutrálny (pokračuje v zabehnutom tempe)
         return BehavioralState.NEUTRAL, 0
 
-    def get_intervention_prompt(self, student_id: str) -> str:
+    def get_intervention_prompt(self, student_id: str, locale: str = "sk") -> str:
         """
-        Vygeneruje text pre K-14 (Communication). 
-        Pravidlo: Žiadna chvála ("Si šikovný!"), žiadny súcit ("To je ťažké, že?").
-        Iba neutrálne konštatovanie faktu a ponuka kontroly.
+        Vygeneruje text pre K-14 (Communication).
         """
         last_obs = self.db.query(WellbeingObservation).filter(
             WellbeingObservation.student_id == student_id
@@ -94,12 +92,15 @@ class WellbeingAnalyticService:
             return "" # Nie je dôvod na intervenciu
 
         if last_obs.inferred_state == BehavioralState.COGNITIVE_OVERLOAD:
-            return "Všimol som si, že posledné úlohy trvali dlhšie a objavili sa chyby. To je bežná súčasť učenia. Chceš si dať 2-minútovú prestávku, alebo si zopakovať predchádzajúcu látku?"
+            from app.modules.k17_wellbeing_companion.i18n import t
+            return t("cognitive_overload", locale)
             
         if last_obs.inferred_state == BehavioralState.AVOIDANCE:
-            return "Zaznamenal som veľmi rýchle odpovede. Ak si si istý, pokračuj. Ak si nie si istý, môžeme si to prejsť spolu."
+            from app.modules.k17_wellbeing_companion.i18n import t
+            return t("avoidance", locale)
             
-        return "Mám otázku ohľadom tvojho súčasného tempa. Chceš pokračovať, alebo zmeniť aktivitu?"
+        from app.modules.k17_wellbeing_companion.i18n import t
+        return t("neutral", locale)
 
     def get_class_balance_metrics(self, class_id: str, hours: int = 24) -> dict:
         """
@@ -214,11 +215,9 @@ class WellbeingAnalyticService:
         # Predvolený stav: Neutrálny (pokračuje v zabehnutom tempe)
         return BehavioralState.NEUTRAL, 0
 
-    def get_intervention_prompt(self, student_id: str) -> str:
+    def get_intervention_prompt(self, student_id: str, locale: str = "sk") -> str:
         """
-        Vygeneruje text pre K-14 (Communication). 
-        Pravidlo: Žiadna chvála ("Si šikovný!"), žiadny súcit ("To je ťažké, že?").
-        Iba neutrálne konštatovanie faktu a ponuka kontroly.
+        Vygeneruje text pre K-14 (Communication).
         """
         last_obs = self.db.query(WellbeingObservation).filter(
             WellbeingObservation.student_id == student_id
@@ -228,12 +227,15 @@ class WellbeingAnalyticService:
             return "" # Nie je dôvod na intervenciu
 
         if last_obs.inferred_state == BehavioralState.COGNITIVE_OVERLOAD:
-            return "Všimol som si, že posledné úlohy trvali dlhšie a objavili sa chyby. To je bežná súčasť učenia. Chceš si dať 2-minútovú prestávku, alebo si zopakovať predchádzajúcu látku?"
+            from app.modules.k17_wellbeing_companion.i18n import t
+            return t("cognitive_overload", locale)
             
         if last_obs.inferred_state == BehavioralState.AVOIDANCE:
-            return "Zaznamenal som veľmi rýchle odpovede. Ak si si istý, pokračuj. Ak si nie si istý, môžeme si to prejsť spolu."
+            from app.modules.k17_wellbeing_companion.i18n import t
+            return t("avoidance", locale)
             
-        return "Mám otázku ohľadom tvojho súčasného tempa. Chceš pokračovať, alebo zmeniť aktivitu?"
+        from app.modules.k17_wellbeing_companion.i18n import t
+        return t("neutral", locale)
 
     def get_class_balance_metrics(self, class_id: str, hours: int = 24) -> dict:
         """
@@ -267,7 +269,7 @@ class WellbeingAnalyticService:
             "requires_teacher_attention": stress_ratio > 15.0 # Threshold: 15%
         }
 
-    def get_latest_intervention_message(self, student_id: str) -> Optional[str]:
+    def get_latest_intervention_message(self, student_id: str, locale: str = "sk") -> Optional[str]:
         """
         Vrátí neutrálnu správu pre študenta, ak bol v posledných 30 minútach 
         detekovaný stav s alert_level >= 2. Inak vráti None.
@@ -286,14 +288,17 @@ class WellbeingAnalyticService:
             
         # Generovanie neutrálnej správy (Patrick Jane prístup: fakty + ponuka kontroly)
         if last_obs.inferred_state == BehavioralState.COGNITIVE_OVERLOAD:
-            return "Všimol som si, že posledné úlohy trvali dlhšie a objavili sa chyby. To je bežná súčasť učenia. Chceš si dať 2-minútovú prestávku, alebo si zopakovať predchádzajúcu látku?"
+            from app.modules.k17_wellbeing_companion.i18n import t
+            return t("cognitive_overload", locale)
         elif last_obs.inferred_state == BehavioralState.AVOIDANCE:
-            return "Zaznamenal som veľmi rýchle odpovede. Ak si si istý, pokračuj. Ak si nie si istý, môžeme si to prejsť spolu."
+            from app.modules.k17_wellbeing_companion.i18n import t
+            return t("avoidance", locale)
         
-        return "Mám otázku ohľadom tvojho súčasného tempa. Chceš pokračovať, alebo zmeniť aktivitu?"
+        from app.modules.k17_wellbeing_companion.i18n import t
+        return t("neutral", locale)
 
 
-    def get_class_signals(self, student_ids, hours: int = 24) -> list:
+    def get_class_signals(self, student_ids, hours: int = 24, locale: str = "sk") -> list:
         from datetime import timedelta
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         result = []
@@ -307,11 +312,14 @@ class WellbeingAnalyticService:
                 continue
             message = None
             if obs.inferred_state == BehavioralState.COGNITIVE_OVERLOAD:
-                message = "Všimol som si, že posledné úlohy trvali dlhšie a objavili sa chyby. To je bežná súčasť učenia. Chceš si dať 2-minútovú prestávku, alebo si zopakovať predchádzajúcu látku?"
+                from app.modules.k17_wellbeing_companion.i18n import t
+                message = t("cognitive_overload", locale)
             elif obs.inferred_state == BehavioralState.AVOIDANCE:
-                message = "Zaznamenal som veľmi rýchle odpovede. Ak si si istý, pokračuj. Ak si nie si istý, môžeme si to prejsť spolu."
+                from app.modules.k17_wellbeing_companion.i18n import t
+                message = t("avoidance", locale)
             else:
-                message = "Mám otázku ohľadom tvojho súčasného tempa. Chceš pokračovať, alebo zmeniť aktivitu?"
+                from app.modules.k17_wellbeing_companion.i18n import t
+                message = t("neutral", locale)
             result.append({
                 "student_id": str(sid),
                 "inferred_state": obs.inferred_state.value if hasattr(obs.inferred_state, "value") else str(obs.inferred_state),
@@ -323,7 +331,7 @@ class WellbeingAnalyticService:
             })
         return result
 
-    def get_child_messages(self, student_id, hours: int = 24) -> list:
+    def get_child_messages(self, student_id, hours: int = 24, locale: str = "sk") -> list:
         from datetime import timedelta
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         obs_list = self.db.query(WellbeingObservation).filter(
@@ -334,11 +342,14 @@ class WellbeingAnalyticService:
         messages = []
         for obs in obs_list:
             if obs.inferred_state == BehavioralState.COGNITIVE_OVERLOAD:
-                messages.append("Všimol som si, že posledné úlohy trvali dlhšie a objavili sa chyby. To je bežná súčasť učenia. Chceš si dať 2-minútovú prestávku, alebo si zopakovať predchádzajúcu látku?")
+                from app.modules.k17_wellbeing_companion.i18n import t
+                messages.append(t("cognitive_overload", locale))
             elif obs.inferred_state == BehavioralState.AVOIDANCE:
-                messages.append("Zaznamenal som veľmi rýchle odpovede. Ak si si istý, pokračuj. Ak si nie si istý, môžeme si to prejsť spolu.")
+                from app.modules.k17_wellbeing_companion.i18n import t
+                messages.append(t("avoidance", locale))
             else:
-                messages.append("Mám otázku ohľadom tvojho súčasného tempa. Chceš pokračovať, alebo zmeniť aktivitu?")
+                from app.modules.k17_wellbeing_companion.i18n import t
+                messages.append(t("neutral", locale))
         # deduplikacia zachovanim poradia
         seen = set()
         unique = []

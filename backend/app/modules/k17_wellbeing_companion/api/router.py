@@ -40,6 +40,7 @@ async def request_intervention(student_id: str, db: Session = Depends(get_db)):
 async def get_intervention_message(
     student_id: str,
     purpose: str | None = None,
+    locale: str = "sk",
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ):
@@ -109,7 +110,7 @@ async def get_intervention_message(
         raise HTTPException(status_code=403, detail="insufficient_permissions")
     
     service = WellbeingAnalyticService(db_session=db)
-    message = service.get_latest_intervention_message(student_id)
+    message = service.get_latest_intervention_message(student_id, locale=locale)
 
     from app.core.audit.logger import write as audit_write
     audit_write(db, principal, action, resource, purpose, "success", {"has_intervention": message is not None})
@@ -126,6 +127,7 @@ async def get_intervention_message(
 async def get_class_signals(
     class_id: str,
     hours: int = 24,
+    locale: str = "sk",
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
@@ -166,7 +168,7 @@ async def get_class_signals(
     student_ids = [e.student_user_id for e in enrollments]
 
     service = WellbeingAnalyticService(db_session=db)
-    signals = service.get_class_signals(student_ids, hours=hours)
+    signals = service.get_class_signals(student_ids, hours=hours, locale=locale)
 
     from app.core.audit.logger import write as audit_write
     audit_write(db, principal, "k17.get_class_signals", f"school_class_group:{class_uuid}", None, "success", {"count": len(signals)})
@@ -197,6 +199,7 @@ async def dismiss_signal(
 
 @router.get("/parent/dashboard")
 async def get_parent_dashboard(
+    locale: str = "sk",
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
@@ -211,7 +214,7 @@ async def get_parent_dashboard(
     service = WellbeingAnalyticService(db_session=db)
     children = []
     for cid in child_ids:
-        messages = service.get_child_messages(str(cid))
+        messages = service.get_child_messages(str(cid), locale=locale)
         children.append({"child_user_id": str(cid), "messages": messages})
 
     from app.core.audit.logger import write as audit_write
