@@ -36,6 +36,9 @@ export default function StudentPage() {
   const [results, setResults] = useState<Record<string, { correct: boolean; answer: string }>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  
+  // K-17: Stav pre neutrálnu intervenciu
+  const [interventionMessage, setInterventionMessage] = useState<string | null>(null);
 
   const load = useCallback(async (): Promise<Data | null> => {
     if (!userId) return null;
@@ -67,6 +70,24 @@ export default function StudentPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // K-17 Wellbeing: Izolovaná kontrola neutrálnej intervencie pri načítaní
+  useEffect(() => {
+    if (!userId) return;
+    const checkIntervention = async () => {
+      try {
+        const res = await apiFetch<{ has_intervention: boolean; message: string | null }>(
+          `/k17/wellbeing/students/${userId}/intervention-message`
+        ).catch(() => null);
+        if (res?.has_intervention && res.message) {
+          setInterventionMessage(res.message);
+        }
+      } catch {
+        // Tiché zlyhanie, aby sa nenarušil hlavný tok aplikácie
+      }
+    };
+    void checkIntervention();
+  }, [userId]);
 
   const topicNames = useMemo(() => {
     const map = new Map<string, string>();
@@ -180,6 +201,14 @@ export default function StudentPage() {
       ]}
     >
       {error ? <Alert>{error}</Alert> : null}
+      
+      {/* K-17: Zobrazenie neutrálnej intervencie od AI */}
+      {interventionMessage ? (
+        <Alert tone="blue">
+          <strong>KOMPAS Asistent:</strong> {interventionMessage}
+        </Alert>
+      ) : null}
+      
       {!data ? <Loading /> : null}
 
       {data ? (
@@ -214,10 +243,7 @@ export default function StudentPage() {
           ) : null}
 
           <section id="odporucania">
-            <Card
-              title="Odporúčania"
-              subtitle="Vychádzajú z tvojich posledných záznamov o učení."
-            >
+            <Card title="Odporúčania" subtitle="Vychádzajú z tvojich posledných záznamov o učení.">
               {data.recommendations.length === 0 ? (
                 <Empty>Zatiaľ žiadne odporúčania. Precviči si nejakú misiu.</Empty>
               ) : (

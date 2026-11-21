@@ -102,3 +102,13 @@ bus = EventBus()
 def current_session() -> Optional[Session]:
     """Session of the transaction that is publishing an event, if any."""
     return _current_session.get()
+
+# ==============================================================================
+# Registrácia handlerov pre K-17 Wellbeing Companion
+# ==============================================================================
+try:
+    from app.modules.k17_wellbeing_companion.events.handlers import on_AnswerEvaluated
+    bus.subscribe("AnswerEvaluated", on_AnswerEvaluated)
+    logger.info("✅ K17 Wellbeing handler subscribed to 'AnswerEvaluated'")
+except ImportError as e:
+    logger.warning(f"⚠️ Could not subscribe K17 Wellbeing handler: {e}")

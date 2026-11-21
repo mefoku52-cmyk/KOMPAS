@@ -36,8 +36,10 @@ def create_app() -> FastAPI:
     def health():
         return {"status": "ok"}
 
+    from app.modules.k17_wellbeing_companion.api.router import router as k17_router
     app.include_router(auth_router)
     app.include_router(privacy_router)
+    app.include_router(k17_router)
 
     # Module registration mechanism: each module exposes register(app, bus)
     from app.modules.k16_intelligent_core import register as register_k16
