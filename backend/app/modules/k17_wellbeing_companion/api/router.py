@@ -120,3 +120,101 @@ async def get_intervention_message(
         "message": message,
         "sender": "kompas_ai_companion"
     }
+
+
+@router.get("/classes/{class_id}/signals")
+async def get_class_signals(
+    class_id: str,
+    hours: int = 24,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    import uuid
+    from sqlalchemy import select
+    from app.core.database.session import Base
+    from app.shared.school import Enrollment
+    from app.modules.k17_wellbeing_companion.services.service import WellbeingAnalyticService
+
+    try:
+        class_uuid = uuid.UUID(class_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_class_id")
+
+    if not (principal.role and principal.role.value == "teacher"):
+        raise HTTPException(status_code=403, detail="teacher_only")
+
+    table = Base.metadata.tables.get("school_class_teacher")
+    assigned = False
+    if table is not None:
+        row = db.execute(
+            select(table.c.id).where(
+                table.c.class_group_id == class_uuid,
+                table.c.teacher_user_id == principal.user_id,
+                table.c.school_id == principal.school_id,
+            )
+        ).first()
+        assigned = row is not None
+    if not assigned:
+        raise HTTPException(status_code=403, detail="not_teacher_of_class")
+
+    enrollments = db.execute(
+        select(Enrollment).where(
+            Enrollment.class_group_id == class_uuid,
+            Enrollment.school_id == principal.school_id,
+        )
+    ).scalars().all()
+    student_ids = [e.student_user_id for e in enrollments]
+
+    service = WellbeingAnalyticService(db_session=db)
+    signals = service.get_class_signals(student_ids, hours=hours)
+
+    from app.core.audit.logger import write as audit_write
+    audit_write(db, principal, "k17.get_class_signals", f"school_class_group:{class_uuid}", None, "success", {"count": len(signals)})
+
+    return {"class_id": class_id, "signals": signals}
+
+
+@router.post("/students/{student_id}/signals/dismiss")
+async def dismiss_signal(
+    student_id: str,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    import uuid
+    try:
+        student_uuid = uuid.UUID(student_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_student_id")
+
+    if not (principal.role and principal.role.value == "teacher"):
+        raise HTTPException(status_code=403, detail="teacher_only")
+
+    from app.core.audit.logger import write as audit_write
+    audit_write(db, principal, "k17.dismiss_signal", f"k17_wellbeing_observation:student:{student_uuid}", None, "success", {"dismissed": True})
+
+    return {"student_id": student_id, "dismissed": True}
+
+
+@router.get("/parent/dashboard")
+async def get_parent_dashboard(
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    if not (principal.role and principal.role.value == "parent"):
+        raise HTTPException(status_code=403, detail="parent_only")
+
+    from app.shared.identity import GuardianLink
+    links = db.query(GuardianLink).filter(GuardianLink.guardian_user_id == principal.user_id).all()
+    child_ids = [l.child_user_id for l in links]
+
+    from app.modules.k17_wellbeing_companion.services.service import WellbeingAnalyticService
+    service = WellbeingAnalyticService(db_session=db)
+    children = []
+    for cid in child_ids:
+        messages = service.get_child_messages(str(cid))
+        children.append({"child_user_id": str(cid), "messages": messages})
+
+    from app.core.audit.logger import write as audit_write
+    audit_write(db, principal, "k17.get_parent_dashboard", "k17_wellbeing_observation:children", None, "success", {"child_count": len(children)})
+
+    return {"children": children}

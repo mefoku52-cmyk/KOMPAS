@@ -184,3 +184,69 @@ def test_intervention_endpoint_denies_other_school(db_session):
         assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_class_signals_requires_teacher(db_session):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security.auth import get_current_principal
+    from app.core.permissions.policy import Principal
+    from app.shared.types import Role
+    import uuid
+
+    client = TestClient(app)
+    principal_id = uuid.uuid4()
+    class_id = uuid.uuid4()
+
+    def override():
+        return Principal(user_id=principal_id, role=Role.STUDENT, school_id=uuid.uuid4())
+
+    app.dependency_overrides[get_current_principal] = override
+    try:
+        response = client.get(f"/k17/wellbeing/classes/{class_id}/signals")
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_parent_dashboard_requires_parent(db_session):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security.auth import get_current_principal
+    from app.core.permissions.policy import Principal
+    from app.shared.types import Role
+    import uuid
+
+    client = TestClient(app)
+
+    def override():
+        return Principal(user_id=uuid.uuid4(), role=Role.STUDENT, school_id=uuid.uuid4())
+
+    app.dependency_overrides[get_current_principal] = override
+    try:
+        response = client.get("/k17/wellbeing/parent/dashboard")
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_dismiss_signal_requires_teacher(db_session):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security.auth import get_current_principal
+    from app.core.permissions.policy import Principal
+    from app.shared.types import Role
+    import uuid
+
+    client = TestClient(app)
+    student_id = uuid.uuid4()
+
+    def override():
+        return Principal(user_id=uuid.uuid4(), role=Role.STUDENT, school_id=uuid.uuid4())
+
+    app.dependency_overrides[get_current_principal] = override
+    try:
+        response = client.post(f"/k17/wellbeing/students/{student_id}/signals/dismiss")
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
+    finally:
+        app.dependency_overrides.clear()
