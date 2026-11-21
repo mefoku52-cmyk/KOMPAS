@@ -39,6 +39,7 @@ async def request_intervention(student_id: str, db: Session = Depends(get_db)):
 @router.get("/students/{student_id}/intervention-message")
 async def get_intervention_message(
     student_id: str,
+    purpose: str | None = None,
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ):
@@ -56,7 +57,9 @@ async def get_intervention_message(
     except ValueError:
         raise HTTPException(status_code=400, detail="invalid_student_id")
     
-    # Kontrolovať oprávnenie
+    resource = f"k17_wellbeing_observation:student:{student_uuid}"
+    action = "k17.get_intervention_message"
+
     # 1. SELF: žiak môže vidieť svoje vlastné dáta
     if principal.user_id == student_uuid:
         pass  # OK
@@ -68,6 +71,8 @@ async def get_intervention_message(
             GuardianLink.child_user_id == student_uuid
         ).first()
         if not link:
+            from app.core.audit.logger import write as audit_write
+            audit_write(db, principal, action, resource, purpose, "denied", {"reason": "not_guardian_of_student"})
             raise HTTPException(status_code=403, detail="not_guardian_of_student")
     # 3. TEACHES_CLASS: učiteľ môže vidieť dáta žiakov zo svojej triedy
     elif principal.role and principal.role.value == "teacher":
@@ -95,13 +100,20 @@ async def get_intervention_message(
                     teaches = True
                     break
         if not teaches:
+            from app.core.audit.logger import write as audit_write
+            audit_write(db, principal, action, resource, purpose, "denied", {"reason": "not_teacher_of_student"})
             raise HTTPException(status_code=403, detail="not_teacher_of_student")
     else:
+        from app.core.audit.logger import write as audit_write
+        audit_write(db, principal, action, resource, purpose, "denied", {"reason": "insufficient_permissions"})
         raise HTTPException(status_code=403, detail="insufficient_permissions")
     
     service = WellbeingAnalyticService(db_session=db)
     message = service.get_latest_intervention_message(student_id)
-    
+
+    from app.core.audit.logger import write as audit_write
+    audit_write(db, principal, action, resource, purpose, "success", {"has_intervention": message is not None})
+
     return {
         "student_id": student_id,
         "has_intervention": message is not None,

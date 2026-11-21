@@ -110,3 +110,77 @@ def test_intervention_endpoint_requires_authorization(db_session):
     finally:
         # 4. Vyčistíme override, aby neovplyvnil ďalšie testy
         app.dependency_overrides.clear()
+
+
+def test_intervention_endpoint_denies_teacher_without_class(db_session):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security.auth import get_current_principal
+    from app.core.permissions.policy import Principal
+    from app.shared.types import Role
+    import uuid
+
+    client = TestClient(app)
+    teacher_id = uuid.uuid4()
+    student_id = uuid.uuid4()
+    school_id = uuid.uuid4()
+
+    def override():
+        return Principal(user_id=teacher_id, role=Role.TEACHER, school_id=school_id)
+
+    app.dependency_overrides[get_current_principal] = override
+    try:
+        response = client.get(f"/k17/wellbeing/students/{student_id}/intervention-message")
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_intervention_endpoint_denies_parent_without_guardian_link(db_session):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security.auth import get_current_principal
+    from app.core.permissions.policy import Principal
+    from app.shared.types import Role
+    import uuid
+
+    client = TestClient(app)
+    parent_id = uuid.uuid4()
+    student_id = uuid.uuid4()
+    school_id = uuid.uuid4()
+
+    def override():
+        return Principal(user_id=parent_id, role=Role.PARENT, school_id=school_id)
+
+    app.dependency_overrides[get_current_principal] = override
+    try:
+        response = client.get(f"/k17/wellbeing/students/{student_id}/intervention-message")
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_intervention_endpoint_denies_other_school(db_session):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security.auth import get_current_principal
+    from app.core.permissions.policy import Principal
+    from app.shared.types import Role
+    import uuid
+
+    client = TestClient(app)
+    student_id = uuid.uuid4()
+    other_school = uuid.uuid4()
+
+    def override():
+        return Principal(user_id=student_id, role=Role.STUDENT, school_id=other_school)
+
+    app.dependency_overrides[get_current_principal] = override
+    try:
+        # same user id but different school_id in principal; SELF check uses user_id only,
+        # so this should still be allowed for self. Instead test a foreign student in other school.
+        foreign_student = uuid.uuid4()
+        response = client.get(f"/k17/wellbeing/students/{foreign_student}/intervention-message")
+        assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
+    finally:
+        app.dependency_overrides.clear()
