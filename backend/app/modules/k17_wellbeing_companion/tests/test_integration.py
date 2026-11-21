@@ -250,3 +250,29 @@ def test_dismiss_signal_requires_teacher(db_session):
         assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_double_processing_does_not_duplicate(db_session):
+    from app.core.events.bus import DomainEvent, bus
+    import uuid
+
+    WellbeingObservation = None
+    from app.modules.k17_wellbeing_companion.repository.models import WellbeingObservation
+    WellbeingObservation.__table__.create(db_session.bind, checkfirst=True)
+
+    payload = {
+        "student_id": "test-double-001",
+        "mission_id": "mission-d",
+        "is_correct": False,
+        "time_taken_sec": 2.0,
+        "consecutive_errors": 1,
+    }
+    event1 = DomainEvent(event_type="AnswerEvaluated", school_id=uuid.uuid4(), payload=dict(payload))
+    event2 = DomainEvent(event_type="AnswerEvaluated", school_id=uuid.uuid4(), payload=dict(payload))
+    bus.publish(event1, db=db_session)
+    bus.publish(event2, db=db_session)
+
+    count = db_session.query(WellbeingObservation).filter(
+        WellbeingObservation.student_id == "test-double-001"
+    ).count()
+    assert count == 1, f"Expected 1 observation, got {count}"

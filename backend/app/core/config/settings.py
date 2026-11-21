@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Analyticke centrum: potlacenie skupin mensich nez prah (predvolene 5)
     analytics_min_group_size: int = Field(default=5, alias="ANALYTICS_MIN_GROUP_SIZE")
 
+    # K-17: interval spracovania počas nečinnosti (sekundy)
+    k17_processing_interval_seconds: int = Field(default=300, alias="K17_PROCESSING_INTERVAL_SECONDS")
+
     database_url: str = Field(..., alias="DATABASE_URL")
 
     db_pool_size: int = Field(default=5, alias="DB_POOL_SIZE")

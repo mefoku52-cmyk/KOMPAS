@@ -67,6 +67,23 @@ def create_app() -> FastAPI:
     for registrar in module_registrars:
         registrar(app, bus)
 
+    @app.on_event("startup")
+    async def _k17_startup() -> None:
+        import asyncio
+        from app.modules.k17_wellbeing_companion.tasks.processor import processing_loop
+
+        app.state.k17_stop_event = asyncio.Event()
+        app.state.k17_task = asyncio.create_task(processing_loop(app.state.k17_stop_event))
+
+    @app.on_event("shutdown")
+    async def _k17_shutdown() -> None:
+        stop_event = getattr(app.state, "k17_stop_event", None)
+        task = getattr(app.state, "k17_task", None)
+        if stop_event is not None:
+            stop_event.set()
+        if task is not None:
+            await task
+
     return app
 
 

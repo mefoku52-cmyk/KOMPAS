@@ -15,7 +15,20 @@ class WellbeingAnalyticService:
     def record_observation(self, student_id: str, event_type: str, metrics: Dict[str, Any]) -> WellbeingObservation:
         """
         Zaznamená surové dáta a vypočíta aktuálny stav na základe kontextu.
+        Idempotentné: ak už existuje pozorovanie s rovnakými údajmi vytvorené
+        v poslednej minúte, vráti existujúce (žiadny duplikát).
         """
+        from datetime import timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=60)
+        existing = self.db.query(WellbeingObservation).filter(
+            WellbeingObservation.student_id == student_id,
+            WellbeingObservation.event_type == event_type,
+            WellbeingObservation.metrics == metrics,
+            WellbeingObservation.timestamp >= cutoff,
+        ).first()
+        if isinstance(existing, WellbeingObservation):
+            return existing
+
         # 1. Získaj posledných 5 pozorovaní tohto žiaka pre kontext (bazálna línia)
         recent_obs = self.db.query(WellbeingObservation).filter(
             WellbeingObservation.student_id == student_id
@@ -136,7 +149,20 @@ class WellbeingAnalyticService:
     def record_observation(self, student_id: str, event_type: str, metrics: Dict[str, Any]) -> WellbeingObservation:
         """
         Zaznamená surové dáta a vypočíta aktuálny stav na základe kontextu.
+        Idempotentné: ak už existuje pozorovanie s rovnakými údajmi vytvorené
+        v poslednej minúte, vráti existujúce (žiadny duplikát).
         """
+        from datetime import timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=60)
+        existing = self.db.query(WellbeingObservation).filter(
+            WellbeingObservation.student_id == student_id,
+            WellbeingObservation.event_type == event_type,
+            WellbeingObservation.metrics == metrics,
+            WellbeingObservation.timestamp >= cutoff,
+        ).first()
+        if isinstance(existing, WellbeingObservation):
+            return existing
+
         # 1. Získaj posledných 5 pozorovaní tohto žiaka pre kontext (bazálna línia)
         recent_obs = self.db.query(WellbeingObservation).filter(
             WellbeingObservation.student_id == student_id
