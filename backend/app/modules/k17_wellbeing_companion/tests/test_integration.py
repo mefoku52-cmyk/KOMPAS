@@ -276,3 +276,28 @@ def test_double_processing_does_not_duplicate(db_session):
         WellbeingObservation.student_id == "test-double-001"
     ).count()
     assert count == 1, f"Expected 1 observation, got {count}"
+
+
+def test_purge_old_observations_is_idempotent(db_session):
+    from datetime import datetime, timedelta, timezone
+    from app.modules.k17_wellbeing_companion.repository.models import WellbeingObservation
+    from app.modules.k17_wellbeing_companion.tasks.processor import purge_old_observations
+
+    WellbeingObservation.__table__.create(db_session.bind, checkfirst=True)
+
+    old_obs = WellbeingObservation(
+        id=str(__import__("uuid").uuid4()),
+        student_id="purge-test",
+        event_type="mission_answer",
+        metrics={"is_correct": False, "time_taken_sec": 2.0, "consecutive_errors": 1},
+        inferred_state=__import__("app.modules.k17_wellbeing_companion.repository.models", fromlist=["BehavioralState"]).BehavioralState.AVOIDANCE,
+        alert_level=2,
+        timestamp=datetime.now(timezone.utc) - timedelta(days=400),
+    )
+    db_session.add(old_obs)
+    db_session.commit()
+
+    first = purge_old_observations(db_session)
+    assert first >= 1
+    second = purge_old_observations(db_session)
+    assert second == 0

@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # K-17: interval spracovania počas nečinnosti (sekundy)
     k17_processing_interval_seconds: int = Field(default=300, alias="K17_PROCESSING_INTERVAL_SECONDS")
 
+    # K-17: doba uchovavania pozorovani (dni)
+    k17_retention_days: int = Field(default=365, alias="K17_RETENTION_DAYS")
+
     database_url: str = Field(..., alias="DATABASE_URL")
 
     db_pool_size: int = Field(default=5, alias="DB_POOL_SIZE")
