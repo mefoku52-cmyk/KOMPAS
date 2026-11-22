@@ -52,7 +52,9 @@ export default function StudentPage() {
         apiFetch<Paged<Recommendation>>(`/k03/recommendations/${userId}`),
         apiFetch<Paged<Mission>>("/k04/missions"),
         apiFetch<Paged<Attempt>>("/k04/attempts/mine"),
-        apiFetch<{ items: ILNotification[] }>(`/intelligence/notifications?role=student`).catch(() => ({ items: [] })),
+        process.env.NEXT_PUBLIC_K18_ENABLED === "false"
+          ? Promise.resolve({ items: [] as ILNotification[] })
+          : apiFetch<{ items: ILNotification[] }>(`/intelligence/notifications?role=student`).catch(() => ({ items: [] })),
       ]);
       const next: Data = {
         profile,

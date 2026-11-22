@@ -40,7 +40,9 @@ export default function TeacherPage() {
         apiFetch<Paged<ClassSummary> & { total: number }>("/k09/classes"),
         apiFetch<Paged<LibraryItem>>("/k07/items"),
         apiFetch<Paged<Draft>>("/k08/drafts"),
-        apiFetch<{ items: ILSituation[] }>("/intelligence/situations").catch(() => ({ items: [] })),
+        process.env.NEXT_PUBLIC_K18_ENABLED === "false"
+          ? Promise.resolve({ items: [] as ILSituation[] })
+          : apiFetch<{ items: ILSituation[] }>("/intelligence/situations").catch(() => ({ items: [] })),
       ]);
       setClasses(classRes.items);
       setItems(itemRes.items);

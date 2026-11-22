@@ -45,7 +45,9 @@ export default function LeadershipPage() {
         apiFetch<Paged<OrgPlan>>("/k10/plans"),
         apiFetch<Paged<OrgTask>>("/k10/tasks"),
         apiFetch<Paged<OperationRequest>>("/k11/requests"),
-        apiFetch<ILReport>("/intelligence/report/system").catch(() => null),
+        process.env.NEXT_PUBLIC_K18_ENABLED === "false"
+          ? Promise.resolve(null)
+          : apiFetch<ILReport>("/intelligence/report/system").catch(() => null),
       ]);
       setAnalytics(overview);
       setPlans(planRes.items);
