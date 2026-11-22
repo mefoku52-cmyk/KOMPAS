@@ -7,7 +7,8 @@ from app.core.database.session import get_db
 from app.core.security.auth import get_current_principal
 from app.shared.types import Principal, Role
 from app.modules.k18_intelligence.services.orchestrator import IntelligenceOrchestrator
-from app.modules.k18_intelligence.repository.store import ILStore
+from app.modules.k18_intelligence.repository.store import ILStore, _to_dict
+from app.modules.k18_intelligence.api.access import require_student_access, can_access_student
 
 router = APIRouter(prefix="/integration", tags=["integration"])
 
@@ -25,14 +26,10 @@ class DomainEventIn(BaseModel):
     occurred_at: Optional[str] = None
 
 
-def _require_auth(principal: Principal):
-    if not principal:
-        raise HTTPException(401, "auth required")
-
-
 @router.post("/events")
 def ingest_domain_event(body: DomainEventIn, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    _require_auth(principal)
+    if not principal:
+        raise HTTPException(401, "auth required")
     payload = dict(body.payload)
     payload.setdefault("school_id", body.school_id or (str(principal.school_id) if principal.school_id else None))
     payload.setdefault("student_user_id", body.student_user_id)
@@ -72,8 +69,8 @@ def _student_safe(db: Session, student_id: str):
 
 @router.get("/students/{student_id}/summary")
 def student_summary(student_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    if principal.role == Role.STUDENT and str(principal.user_id) != student_id:
-        raise HTTPException(403, "forbidden")
+    if principal.role != Role.LEADERSHIP:
+        require_student_access(db, principal, student_id, action="k18.integration.student_summary")
     return _student_safe(db, student_id)
 
 
@@ -81,7 +78,8 @@ def student_summary(student_id: str, db: Session = Depends(get_db), principal: P
 def parent_child_summary(parent_id: str, student_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
     if principal.role == Role.PARENT and str(principal.user_id) != parent_id:
         raise HTTPException(403, "forbidden")
-    # Full GUARDIAN_OF check requires DB link context; keep safe fallback for now.
+    if principal.role != Role.LEADERSHIP:
+        require_student_access(db, principal, student_id, action="k18.integration.parent_child_summary")
     data = _student_safe(db, student_id)
     data["parent_id"] = parent_id
     data["role"] = "parent"
@@ -92,20 +90,24 @@ def parent_child_summary(parent_id: str, student_id: str, db: Session = Depends(
 def teacher_overview(teacher_id: str, class_id: Optional[str] = Query(None), db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
     if principal.role == Role.TEACHER and str(principal.user_id) != teacher_id:
         raise HTTPException(403, "forbidden")
+    if principal.role not in (Role.TEACHER, Role.LEADERSHIP):
+        raise HTTPException(403, "forbidden")
     store = ILStore(db)
     inits = store.list_initiatives()
     signals = []
     for i in inits:
-        if i.recipient_role in ("teacher", None) or i.decision in ("act", "request_more"):
-            signals.append(_to_dict(i))
-    return {"teacher_id": teacher_id, "class_id": class_id, "signals": signals, "notifications": store.list_communications(recipient_role="teacher")}
+        if not (i.recipient_role in ("teacher", None) or i.decision in ("act", "request_more")):
+            continue
+        if i.entity_type == "student" and principal.role == Role.TEACHER and not can_access_student(db, principal, i.entity_id):
+            continue
+        signals.append(_to_dict(i))
+    comms = store.list_communications(recipient_role="teacher")
+    if principal.role == Role.TEACHER:
+        comms = [c for c in comms if c.get("entity_type") != "student" or can_access_student(db, principal, c.get("entity_id"))]
+    return {"teacher_id": teacher_id, "class_id": class_id, "signals": signals, "notifications": comms}
 
 
 @router.get("/health")
 def health():
     return {"ok": True, "integration": "ready", "mode": "read-only-adapter"}
 
-
-def _to_dict(obj):
-    from app.modules.k18_intelligence.repository.store import _to_dict as td
-    return td(obj)
