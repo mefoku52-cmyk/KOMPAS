@@ -14,6 +14,7 @@ import type {
   ClassOverview,
   ClassSummary,
   Draft,
+  ILSituation,
   LibraryItem,
   Paged,
 } from "@/lib/types";
@@ -24,6 +25,7 @@ export default function TeacherPage() {
   const [overview, setOverview] = useState<ClassOverview | null>(null);
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [ilSituations, setIlSituations] = useState<ILSituation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({ title: "", description: "" });
@@ -34,14 +36,16 @@ export default function TeacherPage() {
     setLoading(true);
     setError(null);
     try {
-      const [classRes, itemRes, draftRes] = await Promise.all([
+      const [classRes, itemRes, draftRes, ilRes] = await Promise.all([
         apiFetch<Paged<ClassSummary> & { total: number }>("/k09/classes"),
         apiFetch<Paged<LibraryItem>>("/k07/items"),
         apiFetch<Paged<Draft>>("/k08/drafts"),
+        apiFetch<{ items: ILSituation[] }>("/intelligence/situations").catch(() => ({ items: [] })),
       ]);
       setClasses(classRes.items);
       setItems(itemRes.items);
       setDrafts(draftRes.items);
+      setIlSituations(ilRes.items || []);
       setSelectedClass((prev) => prev ?? classRes.items[0]?.class_group_id ?? null);
     } catch (err) {
       setError(formatApiError(err, "Dáta sa nepodarilo načítať"));
@@ -137,6 +141,7 @@ export default function TeacherPage() {
       subtitle="Kde trieda stojí, čo má v knižnici a ktoré koncepty čakajú na schválenie."
       sections={[
         { id: "trieda", label: "Trieda" },
+        { id: "podpora", label: "Podpora" },
         { id: "kniznica", label: "Knižnica" },
         { id: "koncepty", label: "Koncepty" },
       ]}
@@ -209,6 +214,33 @@ export default function TeacherPage() {
                     tone="green"
                   />
                 </div>
+              )}
+            </Card>
+          </section>
+
+          <section id="podpora">
+            <Card title="Signály podpory" subtitle="Neutrálne signály z Intelligence Layer (K18).">
+              {ilSituations.length === 0 ? (
+                <Empty>Žiadne aktívne signály podpory.</Empty>
+              ) : (
+                <ul className="list">
+                  {ilSituations.slice(0, 8).map((s) => (
+                    <li key={s.id} className="list-item">
+                      <div>
+                        <strong>{s.entity_type}:{s.entity_id}</strong>
+                        <p className="muted small">{s.reason} · {s.decision}</p>
+                      </div>
+                      <div className="row-actions">
+                        <Badge tone={statusTone(s.severity)}>{s.severity}</Badge>
+                        {s.status !== "dismissed" ? (
+                          <button type="button" className="secondary" onClick={async () => {
+                            try { await apiFetch(`/intelligence/situations/${s.id}/dismiss`, { method: "POST", body: JSON.stringify({ reason: "teacher_dismissed" }) }); await loadBase(); } catch {}
+                          }}>Skryť</button>
+                        ) : <Badge tone="gray">Skryté</Badge>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </Card>
           </section>

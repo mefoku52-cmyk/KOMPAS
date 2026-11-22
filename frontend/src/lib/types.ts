@@ -147,3 +147,28 @@ export type Message = {
   body: string;
   valid_from: string;
 };
+
+export type ILNotification = {
+  id: string;
+  initiative_id?: string | null;
+  channel: string;
+  content_key: string;
+  payload: { text?: string; [k: string]: unknown };
+  status: string;
+  sent_at?: string | null;
+  acknowledged_at?: string | null;
+  recipient_role?: string | null;
+  entity_id?: string | null;
+};
+
+export type ILSituation = {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  situation_type: string;
+  severity: string;
+  status: string;
+  decision: string;
+  reason: string;
+  created_at: string;
+};

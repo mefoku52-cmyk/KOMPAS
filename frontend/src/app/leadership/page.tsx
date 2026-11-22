@@ -18,6 +18,8 @@ import type {
   Paged,
 } from "@/lib/types";
 
+type ILReport = { counts: Record<string, number>; invariants: Record<string, boolean>; status: string };
+
 const TRANSITIONS: Record<string, string[]> = {
   submitted: ["approved", "rejected", "cancelled"],
   approved: ["in_progress", "cancelled"],
@@ -29,6 +31,7 @@ export default function LeadershipPage() {
   const [plans, setPlans] = useState<OrgPlan[]>([]);
   const [tasks, setTasks] = useState<OrgTask[]>([]);
   const [requests, setRequests] = useState<OperationRequest[]>([]);
+  const [ilReport, setIlReport] = useState<ILReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -37,16 +40,18 @@ export default function LeadershipPage() {
     setLoading(true);
     setError(null);
     try {
-      const [overview, planRes, taskRes, requestRes] = await Promise.all([
+      const [overview, planRes, taskRes, requestRes, ilRep] = await Promise.all([
         apiFetch<AnalyticsOverview>("/analytics/overview"),
         apiFetch<Paged<OrgPlan>>("/k10/plans"),
         apiFetch<Paged<OrgTask>>("/k10/tasks"),
         apiFetch<Paged<OperationRequest>>("/k11/requests"),
+        apiFetch<ILReport>("/intelligence/report/system").catch(() => null),
       ]);
       setAnalytics(overview);
       setPlans(planRes.items);
       setTasks(taskRes.items);
       setRequests(requestRes.items);
+      setIlReport(ilRep);
     } catch (err) {
       setError(formatApiError(err, "Dáta sa nepodarilo načítať"));
     } finally {
@@ -84,6 +89,7 @@ export default function LeadershipPage() {
       subtitle="Agregované prehľady chránia súkromie malých skupín, organizačné úlohy držia školu v chode."
       sections={[
         { id: "prehlady", label: "Prehľady" },
+        { id: "intelligence", label: "Intelligence" },
         { id: "ulohy", label: "Úlohy" },
         { id: "poziadavky", label: "Požiadavky" },
       ]}
@@ -137,6 +143,24 @@ export default function LeadershipPage() {
                     </li>
                   ))}
                 </ul>
+              )}
+            </Card>
+          </section>
+
+          <section id="intelligence">
+            <Card title="Intelligence Layer (K18)" subtitle="Systémový prehľad IL — len agregované/invarianty.">
+              {!ilReport ? <Empty>Report nie je dostupný alebo chýbajú oprávnenia.</Empty> : (
+                <div className="stack">
+                  <div className="grid">
+                    {Object.entries(ilReport.counts || {}).map(([k, v]) => <Stat key={k} label={k} value={v} />)}
+                  </div>
+                  <div className="stack">
+                    {Object.entries(ilReport.invariants || {}).map(([k, v]) => (
+                      <div key={k} className="bar-row"><span className="bar-label">{k}</span><Badge tone={v ? "green" : "red"}>{v ? "OK" : "FAIL"}</Badge></div>
+                    ))}
+                    <Badge tone={ilReport.status === "INTEGRATED" ? "green" : "amber"}>{ilReport.status}</Badge>
+                  </div>
+                </div>
               )}
             </Card>
           </section>

@@ -8,6 +8,7 @@ import { ACTION_LABELS, TASK_TYPE_LABELS, formatDateTime, statusLabel, statusTon
 import { effectiveStates } from "@/lib/progress";
 import type {
   Attempt,
+  ILNotification,
   Mission,
   MissionTask,
   Paged,
@@ -23,6 +24,7 @@ type Data = {
   missions: Mission[];
   attempts: Attempt[];
   attemptsTotal: number;
+  notifications: ILNotification[];
 };
 
 export default function StudentPage() {
@@ -44,12 +46,13 @@ export default function StudentPage() {
     if (!userId) return null;
     setError(null);
     try {
-      const [profile, states, recommendations, missions, attempts] = await Promise.all([
+      const [profile, states, recommendations, missions, attempts, notifs] = await Promise.all([
         apiFetch<StudentProfile>(`/k01/profiles/${userId}/latest`).catch(() => null),
         apiFetch<Paged<TopicState>>(`/k05/states/${userId}`),
         apiFetch<Paged<Recommendation>>(`/k03/recommendations/${userId}`),
         apiFetch<Paged<Mission>>("/k04/missions"),
         apiFetch<Paged<Attempt>>("/k04/attempts/mine"),
+        apiFetch<{ items: ILNotification[] }>(`/intelligence/notifications?role=student`).catch(() => ({ items: [] })),
       ]);
       const next: Data = {
         profile,
@@ -58,6 +61,7 @@ export default function StudentPage() {
         missions: missions.items,
         attempts: attempts.items,
         attemptsTotal: attempts.total,
+        notifications: (notifs.items || []).filter((n) => !userId || n.entity_id === userId),
       };
       setData(next);
       return next;
@@ -228,6 +232,26 @@ export default function StudentPage() {
           </section>
 
           {flash ? <Alert tone="blue">{flash}</Alert> : null}
+
+          {data.notifications.length > 0 ? (
+            <Card title="Podpora" subtitle="Neutrálne správy od systému podpory.">
+              <ul className="list compact">
+                {data.notifications.slice(0, 5).map((n) => (
+                  <li key={n.id} className="list-item">
+                    <div>
+                      <strong>{n.payload?.text || "Správa podpory"}</strong>
+                      <p className="muted small">{n.status === "acknowledged" ? "Potvrdené" : "Nové"}</p>
+                    </div>
+                    {n.status !== "acknowledged" ? (
+                      <button type="button" className="secondary" onClick={async () => {
+                        try { await apiFetch(`/intelligence/notifications/${n.id}/acknowledge`, { method: "POST" }); await load(); } catch {}
+                      }}>Rozumiem</button>
+                    ) : <Badge tone="gray">Potvrdené</Badge>}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
 
           {data.profile ? (
             <Card title="Môj profil" subtitle="Údaje pre aktuálny školský rok">
