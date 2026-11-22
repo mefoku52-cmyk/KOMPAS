@@ -37,3 +37,30 @@ def queues(db: Session = Depends(get_db), principal: Principal = Depends(get_cur
         return [{"status": s, "c": c} for s, c in rows]
     dlq = db.execute(select(func.count(ILDeadLetter.id))).scalar() or 0
     return {"outbox": cnt(ILOutbox), "inbox": cnt(ILInbox), "dead_letter": dlq}
+
+
+@router.get("/dlq")
+def dlq(limit: int = 100, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
+    require_leadership(db, principal, action="k18.ops.dlq")
+    rows = list(db.execute(select(ILDeadLetter).order_by(ILDeadLetter.last_attempt_at.desc()).limit(limit)).scalars().all())
+    return {"items": [{"id": str(r.id), "event_id": str(r.event_id), "handler": r.handler, "error": r.error, "retry_count": r.retry_count, "last_attempt_at": r.last_attempt_at.isoformat() if r.last_attempt_at else None, "payload": r.payload} for r in rows]}
+
+
+@router.post("/dlq/{dead_letter_id}/retry")
+def dlq_retry(dead_letter_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
+    require_leadership(db, principal, action="k18.ops.dlq.retry")
+    import uuid as _uuid
+    try:
+        did = _uuid.UUID(dead_letter_id)
+    except ValueError:
+        raise HTTPException(400, "invalid id")
+    rec = db.get(ILDeadLetter, did)
+    if not rec:
+        raise HTTPException(404, "not found")
+    payload = rec.payload or {}
+    event_type = payload.get("event_type") or payload.get("type") or "unknown"
+    enqueue_outbox(db, rec.event_id, event_type, payload)
+    ILStore(db).audit("ops.dlq.retry", {"dead_letter_id": str(rec.id), "event_id": str(rec.event_id)}, actor=str(principal.user_id), entity_type="dead_letter", entity_id=str(rec.id), school_id=principal.school_id)
+    db.delete(rec)
+    db.commit()
+    return {"ok": True, "requeued_event_id": str(rec.event_id)}
