@@ -89,23 +89,50 @@ def require_leadership(db: Session, principal: Principal, action: str = "k18.adm
         raise HTTPException(403, "forbidden")
 
 
+def _teacher_assigned_to_class(db: Session, principal: Principal, class_group_id: str | uuid.UUID) -> bool:
+    try:
+        cid = uuid.UUID(str(class_group_id))
+    except Exception:
+        return False
+    if not principal.school_id:
+        return False
+    return _teacher_assigned(db, principal.school_id, cid, principal.user_id)
+
+
+def can_access_entity(db: Session, principal: Principal, entity_type: str | None, entity_id: str | None) -> bool:
+    if principal.is_system:
+        return True
+    if not entity_type or not entity_id:
+        return False
+    et = str(entity_type).lower()
+    if et == "student":
+        return can_access_student(db, principal, entity_id)
+    if et in {"class", "class_group", "group"}:
+        if principal.role == Role.LEADERSHIP:
+            return principal.school_id is not None
+        if principal.role == Role.TEACHER:
+            return _teacher_assigned_to_class(db, principal, entity_id)
+        return False
+    # unknown entity types: only leadership
+    return principal.role == Role.LEADERSHIP
+
+
 def filter_initiatives_for_principal(db: Session, principal: Principal, initiatives):
     if principal.is_system or principal.role == Role.LEADERSHIP:
         return initiatives
     if principal.role in (Role.STUDENT, Role.PARENT):
         out = []
         for i in initiatives:
-            if i.entity_type == "student" and can_access_student(db, principal, i.entity_id):
+            if can_access_entity(db, principal, i.entity_type, i.entity_id):
                 out.append(i)
         return out
     if principal.role == Role.TEACHER:
         out = []
         for i in initiatives:
-            if i.entity_type == "student" and can_access_student(db, principal, i.entity_id):
+            if can_access_entity(db, principal, i.entity_type, i.entity_id):
+                # additionally enforce same-school boundary for non-student signals
+                if i.school_id and principal.school_id and i.school_id != principal.school_id:
+                    continue
                 out.append(i)
-            elif i.entity_type != "student":
-                # class/group signals: only leadership/teacher? allow teacher for now if same school
-                if principal.school_id and (i.school_id is None or i.school_id == principal.school_id):
-                    out.append(i)
         return out
     return []

@@ -8,7 +8,7 @@ from app.core.security.auth import get_current_principal
 from app.shared.types import Principal, Role
 from app.modules.k18_intelligence.services.orchestrator import IntelligenceOrchestrator
 from app.modules.k18_intelligence.repository.store import ILStore, _to_dict
-from app.modules.k18_intelligence.api.access import require_student_access, can_access_student
+from app.modules.k18_intelligence.api.access import require_student_access, can_access_student, can_access_entity, _teacher_assigned_to_class
 
 router = APIRouter(prefix="/integration", tags=["integration"])
 
@@ -38,6 +38,21 @@ def ingest_domain_event(body: DomainEventIn, db: Session = Depends(get_db), prin
     payload.setdefault("entity_id", body.entity_id or body.student_user_id or body.class_id or payload.get("student") or "unknown")
     if body.occurred_at:
         payload.setdefault("occurred_at", body.occurred_at)
+
+    # Scope/ownership enforcement: prevent spoofed school/entity writes.
+    school_id = payload.get("school_id")
+    if principal.school_id and school_id and str(principal.school_id) != str(school_id):
+        ILStore(db).audit("integration.denied", {"reason": "cross_school", "event_type": body.event_type}, actor=str(principal.user_id), school_id=principal.school_id)
+        db.commit()
+        raise HTTPException(403, "forbidden")
+    entity_type = str(payload.get("entity_type") or "unknown")
+    entity_id = str(payload.get("entity_id") or "unknown")
+    if not principal.is_system and principal.role != Role.LEADERSHIP:
+        if not can_access_entity(db, principal, entity_type, entity_id):
+            ILStore(db).audit("integration.denied", {"reason": "entity_scope", "event_type": body.event_type, "entity_type": entity_type, "entity_id": entity_id}, actor=str(principal.user_id), entity_type=entity_type, entity_id=entity_id, school_id=principal.school_id)
+            db.commit()
+            raise HTTPException(403, "forbidden")
+
     mapped = body.event_type
     if body.event_type == "AnswerEvaluated":
         mapped = "mission_answer"
@@ -47,6 +62,7 @@ def ingest_domain_event(body: DomainEventIn, db: Session = Depends(get_db), prin
     eid = _uuid.UUID(body.event_id) if body.event_id else None
     orch = IntelligenceOrchestrator(db)
     res = orch.process_event(mapped, payload, source=f"kompas:{body.source_module}", school_id=payload.get("school_id"), event_id=eid)
+    ILStore(db).audit("integration.accepted", {"event_type": body.event_type, "mapped": mapped, "entity_type": entity_type, "entity_id": entity_id}, actor=str(principal.user_id), entity_type=entity_type, entity_id=entity_id, school_id=principal.school_id)
     db.commit()
     return {"accepted": True, "mapped_event_type": mapped, "result": res}
 
@@ -92,18 +108,26 @@ def teacher_overview(teacher_id: str, class_id: Optional[str] = Query(None), db:
         raise HTTPException(403, "forbidden")
     if principal.role not in (Role.TEACHER, Role.LEADERSHIP):
         raise HTTPException(403, "forbidden")
+    if class_id and principal.role == Role.TEACHER and not _teacher_assigned_to_class(db, principal, class_id):
+        ILStore(db).audit("integration.denied", {"reason": "class_scope", "teacher_id": teacher_id, "class_id": class_id}, actor=str(principal.user_id), entity_type="class", entity_id=str(class_id), school_id=principal.school_id)
+        db.commit()
+        raise HTTPException(403, "forbidden")
     store = ILStore(db)
     inits = store.list_initiatives()
     signals = []
     for i in inits:
         if not (i.recipient_role in ("teacher", None) or i.decision in ("act", "request_more")):
             continue
-        if i.entity_type == "student" and principal.role == Role.TEACHER and not can_access_student(db, principal, i.entity_id):
+        if not can_access_entity(db, principal, i.entity_type, i.entity_id):
             continue
+        if class_id and str(i.entity_id) != str(class_id) and not (i.entity_type == "student" and can_access_student(db, principal, i.entity_id)):
+            # when class filter supplied, keep class entity + accessible students; conservative
+            if i.entity_type == "class" or i.entity_type == "group":
+                continue
         signals.append(_to_dict(i))
     comms = store.list_communications(recipient_role="teacher")
     if principal.role == Role.TEACHER:
-        comms = [c for c in comms if c.get("entity_type") != "student" or can_access_student(db, principal, c.get("entity_id"))]
+        comms = [c for c in comms if can_access_entity(db, principal, c.get("entity_type"), c.get("entity_id"))]
     return {"teacher_id": teacher_id, "class_id": class_id, "signals": signals, "notifications": comms}
 
 

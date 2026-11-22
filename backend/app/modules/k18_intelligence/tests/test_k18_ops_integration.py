@@ -123,3 +123,35 @@ def test_dlq_retry_requeues_and_audits(ctx):
     proc = client.post("/intelligence/ops/process-once?limit=20", headers=h_lead)
     assert proc.status_code == 200
     assert proc.json()["claimed"] >= 1
+
+
+def test_integration_event_rejects_cross_school_and_foreign_entity(ctx):
+    client, d = ctx
+    h_teacher = auth(d["teacher"], Role.TEACHER, d["school"])
+    other_school = uuid.uuid4()
+    other_student = uuid.uuid4()
+
+    # cross-school spoof
+    r1 = client.post("/integration/events", headers=h_teacher, json={
+        "event_type": "AnswerEvaluated", "event_id": str(uuid.uuid4()),
+        "source_module": "k04", "school_id": str(other_school),
+        "student_user_id": str(d["student"]),
+        "payload": {"correct": False, "time_taken_sec": 2},
+    })
+    assert r1.status_code == 403
+
+    # foreign entity in same school but not taught
+    r2 = client.post("/integration/events", headers=h_teacher, json={
+        "event_type": "AnswerEvaluated", "event_id": str(uuid.uuid4()),
+        "source_module": "k04", "school_id": str(d["school"]),
+        "student_user_id": str(other_student),
+        "payload": {"correct": False, "time_taken_sec": 2},
+    })
+    assert r2.status_code == 403
+
+    db = SessionLocal()
+    try:
+        denied = db.execute(select(ILAudit).where(ILAudit.action == "integration.denied")).scalars().all()
+        assert len(denied) >= 2
+    finally:
+        db.close()
