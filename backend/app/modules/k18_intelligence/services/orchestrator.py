@@ -27,7 +27,21 @@ class IntelligenceOrchestrator:
         self.adaptation = EnvironmentAdapter(self.store)
         self.evaluation = OutcomeEvaluator(self.store)
 
+    @staticmethod
+    def _coerce_uuid(value):
+        if value is None:
+            return None
+        if isinstance(value, __import__('uuid').UUID):
+            return value
+        try:
+            return __import__('uuid').UUID(str(value))
+        except Exception:
+            return None
+
     def process_event(self, event_type, payload, source="api", school_id=None, correlation_id=None, event_id=None, locale="sk"):
+        school_id = self._coerce_uuid(school_id)
+        correlation_id = self._coerce_uuid(correlation_id)
+        event_id = self._coerce_uuid(event_id)
         ing = self.perception.ingest(event_type, payload, source=source, school_id=school_id, correlation_id=correlation_id, event_id=event_id)
         entity_type = payload.get("entity_type") or ("student" if payload.get("student_user_id") or payload.get("student") else "group")
         entity_id = payload.get("entity_id") or payload.get("student_user_id") or payload.get("student") or "unknown"
