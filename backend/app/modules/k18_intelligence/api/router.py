@@ -11,7 +11,7 @@ from app.modules.k18_intelligence.services.orchestrator import IntelligenceOrche
 from app.modules.k18_intelligence.repository.store import ILStore, _to_dict
 from app.modules.k18_intelligence.repository.models import ILInitiative, ILCommunication, ILHypothesis, ILPrediction, ILOutcome, ILPerceptionEvent, ILAudit, ILDeadLetter
 from app.modules.k18_intelligence.config import SETTINGS as K18_SETTINGS
-from app.modules.k18_intelligence.api._auth import require
+from app.modules.k18_intelligence.api.access import require_student_access, require_leadership, filter_initiatives_for_principal, can_access_student
 
 router = APIRouter(prefix="/intelligence", tags=["intelligence"])
 
@@ -43,28 +43,34 @@ def status():
 
 @router.post("/events")
 def ingest_event(body: EventIn, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    require(principal, "intelligence.ingest", "intelligence", context={"allow_authenticated_school": True, "school_id": principal.school_id}, db=db)
+    if principal is None:
+        raise HTTPException(401, "auth required")
     orch = IntelligenceOrchestrator(db)
     import uuid as _uuid
     eid = _uuid.UUID(body.event_id) if body.event_id else None
     school_id = body.school_id or (str(principal.school_id) if principal.school_id else None)
     res = orch.process_event(body.event_type, body.payload, source=body.source, school_id=school_id, event_id=eid, locale=body.locale)
+    ILStore(db).audit("intelligence.ingest", {"event_type": body.event_type, "event_id": str(eid) if eid else None, "status": res.get("status")}, actor=str(principal.user_id), school_id=principal.school_id)
     db.commit()
     return res
 
 
 @router.get("/situations")
 def situations(entity_id: Optional[str] = None, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    require(principal, "intelligence.read", "intelligence", context={"allow_authenticated_school": True, "school_id": principal.school_id}, db=db)
+    if principal is None:
+        raise HTTPException(401, "auth required")
     store = ILStore(db)
+    if entity_id and principal.role in (Role.STUDENT, Role.PARENT, Role.TEACHER):
+        # validate access to requested entity
+        if not (principal.role in (Role.STUDENT, Role.PARENT) and str(principal.user_id) == entity_id):
+            require_student_access(db, principal, entity_id, action="k18.situations.read")
     q = select(ILInitiative)
     if entity_id:
         q = q.where(ILInitiative.entity_id == entity_id)
-    if principal.role in (Role.STUDENT, Role.PARENT):
-        q = q.where(ILInitiative.entity_id == str(principal.user_id))
     if principal.school_id:
         q = q.where((ILInitiative.school_id == principal.school_id) | (ILInitiative.school_id.is_(None)))
     inits = list(db.execute(q.order_by(ILInitiative.created_at.desc())).scalars().all())
+    inits = filter_initiatives_for_principal(db, principal, inits)
     by_entity = {}
     for i in inits:
         by_entity.setdefault(i.entity_id, []).append(i)
@@ -77,14 +83,16 @@ def situations(entity_id: Optional[str] = None, db: Session = Depends(get_db), p
 
 @router.get("/situations/{entity_id}")
 def situation_detail(entity_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    require(principal, "intelligence.read", "intelligence", context={"allow_authenticated_school": True, "school_id": principal.school_id}, db=db)
-    if principal.role in (Role.STUDENT, Role.PARENT) and str(principal.user_id) != entity_id:
-        raise HTTPException(403, "forbidden")
+    if principal is None:
+        raise HTTPException(401, "auth required")
+    if principal.role != Role.LEADERSHIP:
+        require_student_access(db, principal, entity_id, action="k18.situation_detail.read")
     store = ILStore(db)
     q = select(ILInitiative).where(ILInitiative.entity_id == entity_id)
     if principal.school_id:
         q = q.where((ILInitiative.school_id == principal.school_id) | (ILInitiative.school_id.is_(None)))
     inits = list(db.execute(q.order_by(ILInitiative.created_at.desc())).scalars().all())
+    inits = filter_initiatives_for_principal(db, principal, inits)
     init_ids = {str(i.id) for i in inits}
     comms = [c for c in store.list_communications() if c.get("entity_id") == entity_id]
     outs = [o for o in store.list_outcomes() if str(o.get("initiative_id")) in init_ids]
@@ -100,7 +108,8 @@ def situation_detail(entity_id: str, db: Session = Depends(get_db), principal: P
 
 @router.post("/situations/{initiative_id}/dismiss")
 def dismiss(initiative_id: str, body: DismissIn, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    require(principal, "intelligence.dismiss", "intelligence", context={"allow_authenticated_school": True, "school_id": principal.school_id}, db=db)
+    if principal is None:
+        raise HTTPException(401, "auth required")
     import uuid as _uuid
     try: iid = _uuid.UUID(initiative_id)
     except ValueError: raise HTTPException(400, "invalid initiative_id")
@@ -108,15 +117,23 @@ def dismiss(initiative_id: str, body: DismissIn, db: Session = Depends(get_db), 
     init = store.get_initiative(iid)
     if not init:
         raise HTTPException(404, "initiative not found")
+    # leadership can dismiss; teacher only for students they teach / same school signals; student/parent no
+    if principal.role == Role.LEADERSHIP:
+        pass
+    elif principal.role == Role.TEACHER and init.entity_type == "student":
+        require_student_access(db, principal, init.entity_id, action="k18.dismiss")
+    else:
+        raise HTTPException(403, "forbidden")
     store.update_initiative_status(init.id, "dismissed", actor=str(principal.user_id))
-    store.audit("situation.dismissed", {"reason": body.reason, "note": body.note}, actor=str(principal.user_id), entity_type="initiative", entity_id=str(init.id), school_id=principal.school_id)
+    store.audit("situation.dismissed", {"reason": body.reason, "note": body.note, "decision_reason": "teacher_or_leadership_dismiss"}, actor=str(principal.user_id), entity_type="initiative", entity_id=str(init.id), school_id=principal.school_id)
     db.commit()
     return {"id": str(init.id), "status": "dismissed"}
 
 
 @router.post("/situations/{initiative_id}/approve")
 def approve(initiative_id: str, body: ApproveIn, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    require(principal, "intelligence.approve", "intelligence", context={"allow_authenticated_school": True, "school_id": principal.school_id}, db=db)
+    if principal is None:
+        raise HTTPException(401, "auth required")
     if principal.role not in (Role.TEACHER, Role.LEADERSHIP):
         raise HTTPException(403, "forbidden")
     import uuid as _uuid
@@ -126,16 +143,19 @@ def approve(initiative_id: str, body: ApproveIn, db: Session = Depends(get_db), 
     init = store.get_initiative(iid)
     if not init:
         raise HTTPException(404, "initiative not found")
+    if principal.role == Role.TEACHER and init.entity_type == "student":
+        require_student_access(db, principal, init.entity_id, action="k18.approve")
     status_val = "approved" if body.approved else "rejected"
     store.update_initiative_status(init.id, status_val, actor=str(principal.user_id))
-    store.audit("initiative.approval", {"approved": body.approved, "note": body.note}, actor=str(principal.user_id), entity_type="initiative", entity_id=str(init.id), school_id=principal.school_id)
+    store.audit("initiative.approval", {"approved": body.approved, "note": body.note, "decision_reason": "human_approval"}, actor=str(principal.user_id), entity_type="initiative", entity_id=str(init.id), school_id=principal.school_id)
     db.commit()
     return {"id": str(init.id), "status": status_val}
 
 
 @router.get("/notifications")
 def notifications(role: Optional[str] = None, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    require(principal, "intelligence.read", "intelligence", context={"allow_authenticated_school": True, "school_id": principal.school_id}, db=db)
+    if principal is None:
+        raise HTTPException(401, "auth required")
     store = ILStore(db)
     eff_role = role
     if principal.role in (Role.STUDENT, Role.PARENT, Role.TEACHER):
@@ -143,12 +163,15 @@ def notifications(role: Optional[str] = None, db: Session = Depends(get_db), pri
     items = store.list_communications(recipient_role=eff_role)
     if principal.role in (Role.STUDENT, Role.PARENT):
         items = [i for i in items if i.get('entity_id') == str(principal.user_id)]
+    elif principal.role == Role.TEACHER:
+        items = [i for i in items if i.get('entity_type') != 'student' or can_access_student(db, principal, i.get('entity_id'))]
     return {"items": items}
 
 
 @router.post("/notifications/{comm_id}/acknowledge")
 def acknowledge(comm_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    require(principal, "intelligence.ack", "intelligence", context={"allow_authenticated_school": True, "school_id": principal.school_id}, db=db)
+    if principal is None:
+        raise HTTPException(401, "auth required")
     import uuid as _uuid
     try: cid = _uuid.UUID(comm_id)
     except ValueError: raise HTTPException(400, "invalid communication_id")
@@ -156,6 +179,13 @@ def acknowledge(comm_id: str, db: Session = Depends(get_db), principal: Principa
     comm = store.get_communication(cid)
     if not comm:
         raise HTTPException(404, "notification not found")
+    # check entity access if linked via initiative
+    init = store.get_initiative(comm.initiative_id) if comm.initiative_id else None
+    if init and init.entity_type == "student" and principal.role in (Role.STUDENT, Role.PARENT, Role.TEACHER):
+        if principal.role in (Role.STUDENT, Role.PARENT) and str(principal.user_id) != init.entity_id:
+            raise HTTPException(403, "forbidden")
+        if principal.role == Role.TEACHER:
+            require_student_access(db, principal, init.entity_id, action="k18.ack")
     store.ack_communication(comm.id)
     store.audit("notification.ack", {"communication_id": str(comm.id)}, actor=str(principal.user_id), entity_type="communication", entity_id=str(comm.id), school_id=principal.school_id)
     db.commit()
@@ -164,8 +194,7 @@ def acknowledge(comm_id: str, db: Session = Depends(get_db), principal: Principa
 
 @router.get("/audit")
 def audit(limit: int = 200, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    if principal.role != Role.LEADERSHIP:
-        raise HTTPException(403, "forbidden")
+    require_leadership(db, principal, action="k18.audit.read")
     store = ILStore(db)
     items = store.list_audit(limit=limit)
     if principal.school_id:
@@ -177,9 +206,8 @@ def audit(limit: int = 200, db: Session = Depends(get_db), principal: Principal 
 # ---- admin/report parity ----
 
 @router.get("/admin/config")
-def admin_config(principal: Principal = Depends(get_current_principal)):
-    if principal.role != Role.LEADERSHIP:
-        raise HTTPException(403, "forbidden")
+def admin_config(db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
+    require_leadership(db, principal, action="k18.admin.config")
     return {
         "intelligence_enabled": K18_SETTINGS["INTELLIGENCE_ENABLED"],
         "retention_days_default": K18_SETTINGS["RETENTION_DAYS_DEFAULT"],
@@ -192,8 +220,7 @@ def admin_config(principal: Principal = Depends(get_current_principal)):
 
 @router.get("/admin/health")
 def admin_health(db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    if principal.role != Role.LEADERSHIP:
-        raise HTTPException(403, "forbidden")
+    require_leadership(db, principal, action="k18.admin.health")
     return {
         "ok": True,
         "db": {
@@ -207,8 +234,7 @@ def admin_health(db: Session = Depends(get_db), principal: Principal = Depends(g
 
 @router.get("/admin/entities")
 def admin_entities(limit: int = 100, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    if principal.role != Role.LEADERSHIP:
-        raise HTTPException(403, "forbidden")
+    require_leadership(db, principal, action="k18.admin.entities")
     q = select(ILInitiative.entity_id, ILInitiative.entity_type, func.count(ILInitiative.id), func.max(ILInitiative.created_at)).group_by(ILInitiative.entity_id, ILInitiative.entity_type).order_by(func.max(ILInitiative.created_at).desc()).limit(limit)
     rows = db.execute(q).all()
     return {"items": [{"entity_id": r[0], "entity_type": r[1], "n": r[2], "last_seen": r[3].isoformat() if r[3] else None} for r in rows]}
@@ -216,8 +242,7 @@ def admin_entities(limit: int = 100, db: Session = Depends(get_db), principal: P
 
 @router.get("/report/system")
 def report_system(db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
-    if principal.role != Role.LEADERSHIP:
-        raise HTTPException(403, "forbidden")
+    require_leadership(db, principal, action="k18.report.system")
     dup = db.execute(select(ILPerceptionEvent.event_id, func.count(ILPerceptionEvent.id)).group_by(ILPerceptionEvent.event_id).having(func.count(ILPerceptionEvent.id) > 1)).all()
     return {
         "counts": {
