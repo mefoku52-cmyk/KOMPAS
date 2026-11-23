@@ -172,3 +172,29 @@ export type ILSituation = {
   reason: string;
   created_at: string;
 };
+
+export type SISSource = {
+  id: string;
+  school_id: string;
+  provider_type: string;
+  name: string;
+  base_url: string | null;
+  config: Record<string, unknown>;
+  is_enabled: boolean;
+  last_sync_at: string | null;
+  last_success_at: string | null;
+  has_secret: boolean;
+  secret_masked: string | null;
+};
+
+export type SISJob = {
+  id: string;
+  school_id: string;
+  source_id: string;
+  mode: string;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  summary: Record<string, unknown>;
+  error: string | null;
+};

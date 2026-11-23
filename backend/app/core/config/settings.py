@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     ai_provider: str = Field(default="null", alias="AI_PROVIDER")
     ai_external_enabled: bool = Field(default=False, alias="AI_EXTERNAL_ENABLED")
 
+    # SIS integrácie (EduPage a ďalšie). Predvolene vypnuté.
+    sis_sync_enabled: bool = Field(default=False, alias="SIS_SYNC_ENABLED")
+    sis_auto_sync_enabled: bool = Field(default=False, alias="SIS_AUTO_SYNC_ENABLED")
+    sis_sync_interval_minutes: int = Field(default=30, alias="SIS_SYNC_INTERVAL_MINUTES")
+    sis_min_poll_seconds: int = Field(default=300, alias="SIS_MIN_POLL_SECONDS")
+    sis_request_timeout_seconds: int = Field(default=30, alias="SIS_REQUEST_TIMEOUT_SECONDS")
+    sis_auto_deactivate_enabled: bool = Field(default=False, alias="SIS_AUTO_DEACTIVATE_ENABLED")
+    sis_deactivate_absent_after_runs: int = Field(default=3, alias="SIS_DEACTIVATE_ABSENT_AFTER_RUNS")
+    sis_allow_write_back: bool = Field(default=False, alias="SIS_ALLOW_WRITE_BACK")
+    sis_secret_key: str = Field(default="", alias="SIS_SECRET_KEY")
+
     @field_validator("jwt_algorithm")
     @classmethod
     def validate_jwt_algorithm(cls, value: str) -> str:
@@ -81,6 +92,27 @@ class Settings(BaseSettings):
     def validate_ai_external_enabled(cls, value: bool) -> bool:
         if value:
             raise ValueError("external AI providers are not implemented (P6).")
+        return value
+
+    @field_validator("sis_min_poll_seconds")
+    @classmethod
+    def validate_sis_min_poll_seconds(cls, value: int) -> int:
+        if value < 300:
+            raise ValueError("SIS_MIN_POLL_SECONDS must be >= 300 (provider safety).")
+        return value
+
+    @field_validator("sis_sync_interval_minutes")
+    @classmethod
+    def validate_sis_sync_interval_minutes(cls, value: int) -> int:
+        if value < 5:
+            raise ValueError("SIS_SYNC_INTERVAL_MINUTES must be >= 5.")
+        return value
+
+    @field_validator("sis_allow_write_back")
+    @classmethod
+    def validate_sis_allow_write_back(cls, value: bool) -> bool:
+        if value:
+            raise ValueError("SIS write-back is disabled by default and not enabled in this build.")
         return value
 
     @field_validator("grade_min", "grade_max")

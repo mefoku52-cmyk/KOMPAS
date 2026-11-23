@@ -10,3 +10,13 @@ node_modules/
 frontend/src/locales/
 
 *.tsbuildinfo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Local K17 backup files
+frontend/.k17_backup/
+
+PROMPT.txt

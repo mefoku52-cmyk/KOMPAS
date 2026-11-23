@@ -46,6 +46,7 @@ import app.modules.k06_virtual_lab.domain.models  # noqa: F401,E402
 import app.modules.k17_wellbeing_companion.repository.models  # noqa: F401,E402
 import app.modules.k18_intelligence.repository.models  # noqa: F401,E402
 import app.modules.k18_intelligence.repository.outbox  # noqa: F401,E402
+import app.modules.k19_sis_integration.domain.models  # noqa: F401,E402
 
 config = context.config
 if config.config_file_name is not None:

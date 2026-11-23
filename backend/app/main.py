@@ -63,8 +63,9 @@ def create_app() -> FastAPI:
     from app.modules.k06_virtual_lab import register as register_k06
     from app.modules.k17_wellbeing_companion import register as register_k17
     from app.modules.k18_intelligence import register as register_k18
+    from app.modules.k19_sis_integration import register as register_k19
 
-    module_registrars = [register_k16, register_k01, register_k02, register_k05, register_k04, register_k03, register_k09, register_k07, register_k08, register_k10, register_k11, register_k12, register_k13, register_k14, register_k15, register_k06, register_k17, register_k18]
+    module_registrars = [register_k16, register_k01, register_k02, register_k05, register_k04, register_k03, register_k09, register_k07, register_k08, register_k10, register_k11, register_k12, register_k13, register_k14, register_k15, register_k06, register_k17, register_k18, register_k19]
     for registrar in module_registrars:
         registrar(app, bus)
 
@@ -80,6 +81,25 @@ def create_app() -> FastAPI:
     async def _k17_shutdown() -> None:
         stop_event = getattr(app.state, "k17_stop_event", None)
         task = getattr(app.state, "k17_task", None)
+        if stop_event is not None:
+            stop_event.set()
+        if task is not None:
+            await task
+
+    @app.on_event("startup")
+    async def _sis_startup() -> None:
+        if not (settings.sis_sync_enabled and settings.sis_auto_sync_enabled):
+            return
+        import asyncio
+        from app.modules.k19_sis_integration.services.scheduler import processing_loop
+
+        app.state.sis_stop_event = asyncio.Event()
+        app.state.sis_task = asyncio.create_task(processing_loop(app.state.sis_stop_event))
+
+    @app.on_event("shutdown")
+    async def _sis_shutdown() -> None:
+        stop_event = getattr(app.state, "sis_stop_event", None)
+        task = getattr(app.state, "sis_task", None)
         if stop_event is not None:
             stop_event.set()
         if task is not None:

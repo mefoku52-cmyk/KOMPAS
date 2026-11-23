@@ -26,6 +26,7 @@ from app.core.config.settings import settings  # noqa: E402
 from app.core.database.session import SessionLocal  # noqa: E402
 from app.core.rollover import rollover_school_year  # noqa: E402
 from app.core.security.auth import hash_password, validate_password_policy  # noqa: E402
+from app.modules.k19_sis_integration.services.sync_service import SISService  # noqa: E402
 from app.shared.identity import RoleAssignment, User  # noqa: E402
 from app.shared.school import School, SchoolYear  # noqa: E402
 from app.shared.types import SYSTEM_USER_ID, Principal, Role, system_principal  # noqa: E402
@@ -40,12 +41,12 @@ def _output(payload: dict) -> None:
 
 
 def _read_password(args: argparse.Namespace, *, confirm: bool = False) -> str:
-    if getattr(args, "password_stdin", False):
+    if getattr(args, "password_stdin", False) or getattr(args, "api_key_stdin", False):
         value = sys.stdin.readline().rstrip("\n")
         if not value:
             raise SystemExit("password is empty")
         return value
-    env_name = getattr(args, "password_env", None)
+    env_name = getattr(args, "password_env", None) or getattr(args, "api_key_env", None)
     if env_name:
         value = os.environ.get(env_name, "")
         if not value:
@@ -207,6 +208,56 @@ def cmd_export_audit(args: argparse.Namespace) -> None:
         db.close()
 
 
+def cmd_sis_add_source(args: argparse.Namespace) -> None:
+    db = SessionLocal()
+    try:
+        school_id = uuid.UUID(args.school_id)
+        principal = _system_for_school(school_id)
+        api_key = _read_password(args, confirm=False) if args.api_key_stdin or args.api_key_env else args.api_key
+        svc = SISService(db)
+        src = svc.create_source(principal, school_id=school_id, provider_type=args.provider, name=args.name, subdomain=args.subdomain, base_url=args.base_url, api_key=api_key, is_enabled=args.enabled)
+        db.commit()
+        _output(svc._source_public(src))
+    finally:
+        db.close()
+
+
+def cmd_sis_list_sources(args: argparse.Namespace) -> None:
+    db = SessionLocal()
+    try:
+        school_id = uuid.UUID(args.school_id)
+        principal = _system_for_school(school_id)
+        items = SISService(db).list_sources(principal, school_id=school_id)
+        db.commit()
+        _output({"items": items, "total": len(items)})
+    finally:
+        db.close()
+
+
+def cmd_sis_test(args: argparse.Namespace) -> None:
+    db = SessionLocal()
+    try:
+        school_id = uuid.UUID(args.school_id)
+        principal = _system_for_school(school_id)
+        result = SISService(db).test_connection(principal, school_id=school_id, source_id=uuid.UUID(args.source_id))
+        db.commit()
+        _output(result)
+    finally:
+        db.close()
+
+
+def cmd_sis_sync(args: argparse.Namespace) -> None:
+    db = SessionLocal()
+    try:
+        school_id = uuid.UUID(args.school_id)
+        principal = _system_for_school(school_id)
+        result = SISService(db).run_sync(principal, school_id=school_id, source_id=uuid.UUID(args.source_id), mode=args.mode)
+        db.commit()
+        _output(result)
+    finally:
+        db.close()
+
+
 def _find_user(db, args: argparse.Namespace) -> User:
     if getattr(args, "user_id", None):
         user = db.get(User, uuid.UUID(args.user_id))
@@ -264,6 +315,33 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--school-id")
     p.add_argument("--output", required=True)
     p.set_defaults(func=cmd_export_audit)
+
+    p = sub.add_parser("sis-add-source")
+    p.add_argument("--school-id", required=True)
+    p.add_argument("--provider", default="edupage")
+    p.add_argument("--name", required=True)
+    p.add_argument("--subdomain")
+    p.add_argument("--base-url")
+    p.add_argument("--api-key")
+    p.add_argument("--api-key-stdin", action="store_true")
+    p.add_argument("--api-key-env")
+    p.add_argument("--enabled", action="store_true")
+    p.set_defaults(func=cmd_sis_add_source)
+
+    p = sub.add_parser("sis-list-sources")
+    p.add_argument("--school-id", required=True)
+    p.set_defaults(func=cmd_sis_list_sources)
+
+    p = sub.add_parser("sis-test")
+    p.add_argument("--school-id", required=True)
+    p.add_argument("--source-id", required=True)
+    p.set_defaults(func=cmd_sis_test)
+
+    p = sub.add_parser("sis-sync")
+    p.add_argument("--school-id", required=True)
+    p.add_argument("--source-id", required=True)
+    p.add_argument("--mode", default="dry_run", choices=["full", "dry_run", "delta"])
+    p.set_defaults(func=cmd_sis_sync)
 
     return parser
 
