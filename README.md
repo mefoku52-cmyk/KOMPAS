@@ -96,7 +96,7 @@ cd frontend
 npm run build
 ```
 
-Poznámka k prostrediu: v Termux/Android bol build funkčný s úpravou z kroku 6.9 (Next 13.5.x, Babel fallback `.babelrc`, `swcMinify: false`, build cez `node node_modules/next/dist/bin/next build`), pretože natívny SWC pre `android-arm64` nebol dostupný. e2e testy (Playwright) v tomto prostredí neboli spustiteľné (chýbajú browser binárky); detail a alternatívy sú v `docs/REPORT_FAZA_7.md`.
+Poznámka k prostrediu: pre Termux/Android je zachovaný Babel fallback (`frontend/.babelrc` + `@babel/runtime`), pretože natívny SWC pre `android-arm64` nemusí byť dostupný. Lokálny vývojový server otvoríš na `http://127.0.0.1:3000` po spustení `npm run dev` v `frontend/`. Ak potrebuješ prihlásenie a dáta, spusti aj backend na porte 8000 cez `bash scripts/run_dev.sh` z koreňa. e2e testy (Playwright) v tomto prostredí nemusia byť spustiteľné (chýbajú browser binárky); detail a alternatívy sú v `docs/REPORT_FAZA_7.md`.
 
 ## Demonštračné dáta (seed)
 
