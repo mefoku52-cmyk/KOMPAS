@@ -75,9 +75,10 @@ export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}
   return (await res.text()) as unknown as T;
 }
 
-export async function login(username: string, password: string, school_id?: string): Promise<{ access_token: string }> {
+export async function login(username: string, password: string, school_id?: string, role?: Role): Promise<{ access_token: string }> {
   const body: Record<string, string> = { username, password };
   if (school_id) body.school_id = school_id;
+  if (role) body.role = role;
   return apiFetch<{ access_token: string }>("/auth/login", {
     method: "POST",
     body: JSON.stringify(body),
