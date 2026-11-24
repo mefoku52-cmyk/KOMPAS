@@ -54,7 +54,7 @@ export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}
   }
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
-  if (res.status === 401 || res.status === 403) {
+  if ((res.status === 401 || res.status === 403) && path !== "/auth/login") {
     handleAuthError(res.status);
   }
   if (!res.ok) {

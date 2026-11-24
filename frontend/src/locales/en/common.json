@@ -1,6 +1,6 @@
 {
   "app": { "title": "KOMPAS", "login": "Login", "logout": "Log out" },
-  "auth": { "username": "Username", "password": "Password", "submit": "Sign in", "invalid": "Invalid credentials" },
+  "auth": { "username": "Username", "password": "Password", "submit": "Sign in", "invalid": "The username or password could not be verified.", "noActiveRole": "The login details were verified, but this account has no active role assignment. Contact your school administrator.", "roleSelection": "This account has multiple active roles, and role selection is not available on the login screen yet. Contact your school administrator.", "accountLocked": "This account is temporarily locked. Try again later or contact your school administrator.", "rateLimited": "Sign-in is temporarily rate-limited. Try again later." },
   "roles": { "student": "Student", "teacher": "Teacher", "leadership": "Leadership", "parent": "Parent" },
   "student": { "title": "Personal progress", "progress": "Learning status", "covered": "Covered", "practiced": "Practiced", "verified": "Verified", "assignments": "Assignments", "submitAnswer": "Submit answer" },
   "teacher": { "title": "Teacher", "classOverview": "Class overview", "library": "Preparation library", "assistant": "Assistant", "assistantNote": "Draft requires teacher approval." },

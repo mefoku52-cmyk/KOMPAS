@@ -12,6 +12,19 @@ const roleToPath: Record<string, string> = {
   parent: "/parent",
 };
 
+function loginErrorMessage(error: unknown): string {
+  const detail = typeof error === "object" && error !== null && "detail" in error
+    ? (error as { detail?: unknown }).detail
+    : undefined;
+  if (typeof detail === "string") {
+    if (detail === "no_active_role_assignment") return sk.auth.noActiveRole;
+    if (detail === "role_selection_required") return sk.auth.roleSelection;
+    if (detail === "account_locked") return sk.auth.accountLocked;
+    if (detail === "rate_limited") return sk.auth.rateLimited;
+  }
+  return sk.auth.invalid;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -44,8 +57,8 @@ export default function HomePage() {
       }
       setRole(role);
       router.replace(roleToPath[role]);
-    } catch {
-      setError(sk.auth.invalid);
+    } catch (err) {
+      setError(loginErrorMessage(err));
     } finally {
       setLoading(false);
     }
