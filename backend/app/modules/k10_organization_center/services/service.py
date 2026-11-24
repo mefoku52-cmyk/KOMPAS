@@ -50,6 +50,14 @@ class K10Service:
     def assign_task(self, principal: Principal, *, school_id: uuid.UUID, task_id: uuid.UUID, assignee_user_id: uuid.UUID, role_in_task: str | None = None, is_demo: bool = False):
         action = "k10.assign_task"
         self._auth(principal, action, f"organization_task:{task_id}", school_id)
+        from app.modules.k10_organization_center.domain.models import OrgTask
+        from app.shared.identity import User
+        task = self.db.get(OrgTask, task_id)
+        assignee = self.db.get(User, assignee_user_id)
+        if task is None or task.school_id != school_id:
+            raise ValueError("task_not_found_in_school")
+        if assignee is None or assignee.school_id != school_id or not assignee.is_active:
+            raise ValueError("assignee_not_found_in_school")
         obj = self.repo.add_assignment(school_id=school_id, task_id=task_id, assignee_user_id=assignee_user_id, role_in_task=role_in_task, is_demo=is_demo)
         audit_write(self.db, principal, action, f"organization_assignment:{obj.id}", None, "success")
         return obj

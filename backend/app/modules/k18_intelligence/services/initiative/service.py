@@ -38,10 +38,11 @@ class InitiativeEngine:
         if not allowed and decision == "act":
             decision, action_type, reason = "observe", "observe", f"bezpečnostná politika: {why}"
 
+        approval_required = self.safety.requires_human_approval(urgency, entity_type) and decision == "act"
         init = {
             "id": new_uuid(), "situation_id": None, "entity_type": entity_type, "entity_id": str(entity_id),
             "action_type": action_type, "decision": decision, "recipient_user_id": None, "recipient_role": recipient_role,
-            "status": "pending" if decision == "act" else "closed", "reason": reason, "urgency": urgency,
+            "status": "pending_approval" if approval_required else ("pending" if decision == "act" else "closed"), "reason": reason, "urgency": urgency,
             "created_at": utc_now(), "decided_at": utc_now(), "decided_by": "system", "dismissed_at": None, "school_id": school_id,
         }
         rec = self.store.save_initiative(init)

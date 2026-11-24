@@ -154,3 +154,11 @@ def test_sis_api_rbac(db_session):
     r_list = client.get("/integrations/sis/sources")
     assert r_list.status_code == 200
     assert r_list.json()["total"] == 1
+
+
+def test_edupage_rejects_non_edupage_or_non_https_base_url():
+    import pytest
+    from app.integrations.sis.edupage import EduPageProvider
+    for url in ("http://school.edupage.org", "https://127.0.0.1", "https://attacker.example", "https://user:pass@school.edupage.org"):
+        with pytest.raises(ValueError, match="invalid_edupage_base_url"):
+            EduPageProvider(subdomain="school", api_key="secret", base_url=url)

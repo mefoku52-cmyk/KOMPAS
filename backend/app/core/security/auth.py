@@ -146,11 +146,26 @@ def get_current_principal(
         expected = user.password_changed_at.astimezone(timezone.utc).isoformat()
         if token_ts != expected:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="token_expired_by_password_change")
+    # Never trust a long-lived JWT role claim as current authorization: roles may be revoked.
+    school_id = user.school_id
+    token_school = payload.get("school_id")
+    if token_school and str(school_id) != str(token_school):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="token_school_mismatch")
     role_str = payload.get("role")
-    role = Role(role_str) if role_str else None
-    if role is None:
-        ra = db.query(RoleAssignment).filter(RoleAssignment.user_id == user_id).first()
-        if ra:
-            role = Role(ra.role)
-    school_id = uuid.UUID(payload["school_id"]) if payload.get("school_id") else getattr(user, "school_id", None)
+    now = datetime.now(timezone.utc)
+    stmt = select(RoleAssignment).where(
+        RoleAssignment.user_id == user_id,
+        RoleAssignment.school_id == school_id,
+        RoleAssignment.valid_from <= now,
+        (RoleAssignment.valid_to.is_(None) | (RoleAssignment.valid_to > now)),
+    )
+    if role_str:
+        stmt = stmt.where(RoleAssignment.role == role_str)
+    assignment = db.execute(stmt).scalars().first()
+    if assignment is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="role_revoked")
+    try:
+        role = Role(assignment.role)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_role_assignment") from exc
     return Principal(user_id=user_id, role=role, school_id=school_id)

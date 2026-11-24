@@ -1,6 +1,8 @@
 import uuid
 
 import pytest
+from sqlalchemy import insert
+from app.core.database.session import Base
 
 from app.modules.k01_learning_profile.services.service import K01Service
 from app.shared.identity import GuardianLink, User
@@ -27,6 +29,7 @@ def _setup_base(db_session):
     db_session.flush()
     db_session.add(Enrollment(school_id=school_id, school_year_id=year_id, class_group_id=class_id, student_user_id=student_id))
     db_session.flush()
+    db_session.execute(insert(Base.metadata.tables["school_class_teacher"]).values(id=uuid.uuid4(), school_id=school_id, class_group_id=class_id, teacher_user_id=teacher_id))
     db_session.add(GuardianLink(guardian_user_id=parent_id, child_user_id=student_id, school_id=school_id))
     db_session.commit()
     return {
@@ -90,8 +93,10 @@ def test_k01_teacher_requires_teaches_class_and_leadership_requires_purpose(db_s
     teacher = Principal(user_id=ctx["teacher_id"], role=Role.TEACHER, school_id=ctx["school_id"])
     ok = svc.list_history(teacher, ctx["student_id"], ctx["school_id"], class_group_id=ctx["class_id"], teaches=True)
     assert len(ok) == 1
+    assert len(svc.list_history(teacher, ctx["student_id"], ctx["school_id"], class_group_id=ctx["class_id"], teaches=False)) == 1
+    unassigned_teacher = Principal(user_id=ctx["other_id"], role=Role.TEACHER, school_id=ctx["school_id"])
     with pytest.raises(PermissionError):
-        svc.list_history(teacher, ctx["student_id"], ctx["school_id"], class_group_id=ctx["class_id"], teaches=False)
+        svc.list_history(unassigned_teacher, ctx["student_id"], ctx["school_id"], class_group_id=ctx["class_id"], teaches=True)
 
     leader = Principal(user_id=ctx["leader_id"], role=Role.LEADERSHIP, school_id=ctx["school_id"])
     ok2 = svc.list_history(leader, ctx["student_id"], ctx["school_id"], purpose="support_review")

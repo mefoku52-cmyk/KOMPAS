@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
@@ -26,11 +27,23 @@ class SISService:
             audit_write(self.db, principal, "sis.access", f"school:{school_id}", "sis_admin", "denied", {"reason": "leadership_required"})
             raise PermissionError("leadership_required")
 
+    @staticmethod
+    def _validate_base_url(base_url: str | None) -> None:
+        if base_url is None or not base_url.strip():
+            return
+        parsed = urlsplit(base_url.strip())
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if (parsed.scheme != "https" or not host.endswith(".edupage.org")
+                or parsed.username or parsed.password or parsed.port
+                or parsed.query or parsed.fragment or parsed.path not in ("", "/")):
+            raise ValueError("invalid_edupage_base_url")
+
     def create_source(self, principal: Principal, *, school_id: uuid.UUID, provider_type: str, name: str, subdomain: str | None = None, base_url: str | None = None, api_key: str | None = None, config: dict | None = None, is_enabled: bool = False) -> SISSource:
         self._require_leadership(principal, school_id)
         provider_type = (provider_type or "edupage").lower().strip()
         if provider_type != "edupage":
             raise ValueError("unsupported_provider")
+        self._validate_base_url(base_url)
         cfg = dict(config or {})
         if subdomain:
             cfg["subdomain"] = subdomain.strip()
@@ -47,6 +60,7 @@ class SISService:
         if name is not None:
             src.name = name.strip()
         if base_url is not None:
+            self._validate_base_url(base_url)
             src.base_url = base_url
         if config is not None:
             merged = dict(src.config or {})
@@ -97,8 +111,11 @@ class SISService:
         api_key = decrypt_secret(source.encrypted_secret)
         subdomain = str((source.config or {}).get("subdomain") or "").strip()
         if not subdomain and source.base_url:
-            host = source.base_url.replace("https://", "").replace("http://", "").split("/")[0]
-            subdomain = host.split(".")[0]
+            parsed = urlsplit(source.base_url)
+            host = (parsed.hostname or "").lower().rstrip(".")
+            if not host.endswith(".edupage.org"):
+                raise ValueError("invalid_edupage_base_url")
+            subdomain = host.removesuffix(".edupage.org")
         if not subdomain:
             raise ValueError("missing_subdomain")
         return EduPageProvider(subdomain=subdomain, api_key=api_key, base_url=source.base_url)

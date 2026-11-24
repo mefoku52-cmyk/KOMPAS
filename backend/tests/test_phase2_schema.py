@@ -15,6 +15,9 @@ AREA_PREFIXES = {
     "communication": "communication_",
     "ai_knowledge": "ai_knowledge_",
     "audit": "audit_",
+    "sis": "sis_",
+    "wellbeing": "k17_",
+    "intelligence": "il_",
 }
 TABLE_TO_AREA = {"audit_event_log": "audit"}
 

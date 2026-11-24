@@ -13,6 +13,15 @@ class K03Repository:
         self.db = db
 
     def add_recommendation(self, *, school_id: uuid.UUID, student_user_id: uuid.UUID, topic_id: uuid.UUID, reason: str, suggested_action: str = "practice", is_demo: bool = False) -> AdaptiveRecommendation:
+        existing = self.db.execute(select(AdaptiveRecommendation).where(
+            AdaptiveRecommendation.school_id == school_id,
+            AdaptiveRecommendation.student_user_id == student_user_id,
+            AdaptiveRecommendation.topic_id == topic_id,
+            AdaptiveRecommendation.reason == reason,
+            AdaptiveRecommendation.suggested_action == suggested_action,
+        ).order_by(AdaptiveRecommendation.valid_from.desc())).scalars().first()
+        if existing is not None:
+            return existing
         obj = AdaptiveRecommendation(school_id=school_id, student_user_id=student_user_id, topic_id=topic_id, reason=reason, suggested_action=suggested_action, is_demo=is_demo)
         self.db.add(obj)
         self.db.flush()

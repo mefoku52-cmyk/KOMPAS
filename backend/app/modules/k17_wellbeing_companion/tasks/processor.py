@@ -38,6 +38,7 @@ async def processing_loop(stop_event: asyncio.Event) -> None:
             db = SessionLocal()
             try:
                 process_once(db)
+                purge_old_observations(db)
                 db.commit()
             finally:
                 db.close()

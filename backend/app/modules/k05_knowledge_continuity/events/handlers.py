@@ -68,6 +68,23 @@ def handle_answer_evaluated(event: DomainEvent) -> None:
             db.close()
 
 
+def _handle_with_retry(event: DomainEvent, *, max_attempts: int = 3) -> None:
+    """Retry only after handle_answer_evaluated has rolled back its failed transaction."""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            handle_answer_evaluated(event)
+            return
+        except Exception:
+            if attempt >= max_attempts:
+                logger.exception("k05 answer_evaluated retries exhausted", extra={"event_id": str(event.event_id)})
+                raise
+            logger.warning(
+                "retrying k05 answer_evaluated handler",
+                extra={"event_id": str(event.event_id), "attempt": attempt},
+                exc_info=True,
+            )
+
+
 def register(bus: EventBus) -> None:
-    bus.subscribe("learning.answer_evaluated", handle_answer_evaluated)
-    bus.subscribe("AnswerEvaluated", handle_answer_evaluated)
+    bus.subscribe("learning.answer_evaluated", _handle_with_retry)
+    bus.subscribe("AnswerEvaluated", _handle_with_retry)

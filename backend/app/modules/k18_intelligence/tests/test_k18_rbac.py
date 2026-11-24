@@ -13,7 +13,7 @@ from app.main import create_app
 from app.core.database.session import Base, engine, SessionLocal
 from app.core.security.auth import create_access_token
 from app.shared.types import Role
-from app.shared.identity import User, GuardianLink
+from app.shared.identity import User, GuardianLink, RoleAssignment
 from app.shared.school import School, SchoolYear, ClassGroup, Enrollment
 
 
@@ -25,11 +25,19 @@ def setup_module():
 def mk_user(db, school_id, role, username=None):
     uid = uuid.uuid4()
     db.add(User(id=uid, school_id=school_id, username=username or f"u-{uid}", full_name="U", password_hash="x", is_active=True))
+    db.add(RoleAssignment(user_id=uid, school_id=school_id, role=role.value))
     db.flush()
     return uid
 
 
 def auth_headers(user_id, role, school_id):
+    db = SessionLocal()
+    try:
+        if not db.query(RoleAssignment).filter_by(user_id=user_id, school_id=school_id, role=role.value).first():
+            db.add(RoleAssignment(user_id=user_id, school_id=school_id, role=role.value))
+            db.commit()
+    finally:
+        db.close()
     token = create_access_token(str(user_id), role, school_id)
     return {"Authorization": f"Bearer {token}"}
 

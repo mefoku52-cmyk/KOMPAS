@@ -9,6 +9,7 @@ from app.main import create_app
 from app.core.database.session import Base, engine, SessionLocal
 from app.core.security.auth import create_access_token
 from app.shared.types import Role
+from app.shared.identity import RoleAssignment
 from app.shared.identity import User
 from app.shared.school import School
 
@@ -27,6 +28,9 @@ def auth(role=Role.TEACHER, school_id=None, user_id=None):
             db.flush()
         if not db.get(User, uid):
             db.add(User(id=uid, school_id=sid, username=f"u-{uid}", full_name="Test", password_hash="x", is_active=True))
+            db.flush()
+        if not db.query(RoleAssignment).filter_by(user_id=uid, school_id=sid, role=role.value).first():
+            db.add(RoleAssignment(user_id=uid, school_id=sid, role=role.value))
         db.commit()
     finally:
         db.close()
@@ -41,10 +45,7 @@ def test_k18_status_and_ingest():
     r = client.get("/intelligence/status")
     assert r.status_code == 200
     r = client.post("/intelligence/events", headers=headers, json={"event_type": "mission_answer", "payload": {"entity_type": "student", "entity_id": "S1", "correct": False, "time_taken_sec": 2}})
-    assert r.status_code == 200
-    d = r.json()
-    assert d["status"] == "processed"
-    assert d["initiative"]["entity_id"] == "S1"
+    assert r.status_code == 403
 
 
 def test_k18_duplicate_event_id():
@@ -55,5 +56,5 @@ def test_k18_duplicate_event_id():
     body = {"event_type": "mission_answer", "event_id": eid, "payload": {"entity_type": "student", "entity_id": "S2", "correct": False, "time_taken_sec": 2}}
     r1 = client.post("/intelligence/events", headers=headers, json=body)
     r2 = client.post("/intelligence/events", headers=headers, json=body)
-    assert r1.json()["status"] == "processed"
-    assert r2.json()["status"] == "duplicate"
+    assert r1.status_code == 403
+    assert r2.status_code == 403

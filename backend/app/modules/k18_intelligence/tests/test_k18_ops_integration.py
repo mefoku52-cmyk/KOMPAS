@@ -13,6 +13,7 @@ from app.main import create_app
 from app.core.database.session import Base, engine, SessionLocal
 from app.core.security.auth import create_access_token
 from app.shared.types import Role
+from app.shared.identity import RoleAssignment
 from app.shared.identity import User
 from app.shared.school import School, SchoolYear, ClassGroup, Enrollment
 from app.modules.k18_intelligence.repository.models import ILDeadLetter, ILAudit, ILPerceptionEvent
@@ -31,6 +32,13 @@ def mk_user(db, school_id, username):
 
 
 def auth(user_id, role, school_id):
+    db = SessionLocal()
+    try:
+        if not db.query(RoleAssignment).filter_by(user_id=user_id, school_id=school_id, role=role.value).first():
+            db.add(RoleAssignment(user_id=user_id, school_id=school_id, role=role.value))
+            db.commit()
+    finally:
+        db.close()
     return {"Authorization": f"Bearer {create_access_token(str(user_id), role, school_id)}"}
 
 

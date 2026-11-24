@@ -5,6 +5,7 @@ import pytest
 from app.core.permissions.policy import Scope, Visibility, authorize
 from app.shared.identity import GuardianLink, User
 from app.shared.school import ClassGroup, Enrollment, School, SchoolYear
+from app.modules.k09_class_overview.domain.models import ClassTeacherAssignment
 from app.shared.types import Principal, Role
 
 
@@ -32,6 +33,7 @@ def _setup(db_session):
     db_session.add(Enrollment(school_id=school_id, school_year_id=year_id, class_group_id=class_b, student_user_id=student_b))
     db_session.flush()
     db_session.add(GuardianLink(guardian_user_id=parent_a, child_user_id=student_a, school_id=school_id))
+    db_session.add(ClassTeacherAssignment(school_id=school_id, class_group_id=class_a, teacher_user_id=teacher_a))
     db_session.commit()
     return {
         "school_id": school_id,

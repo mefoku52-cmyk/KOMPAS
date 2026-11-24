@@ -48,7 +48,7 @@ class WellbeingAnalyticService:
             timestamp=datetime.now(timezone.utc)
         )
         self.db.add(observation)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(observation)
         return observation
 
@@ -111,15 +111,23 @@ class WellbeingAnalyticService:
         
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         
-        # Počet udalostí s vysokým alertom (COGNITIVE_OVERLOAD, AVOIDANCE)
+        from app.shared.school import Enrollment
+        try:
+            class_uuid = uuid.UUID(str(class_id))
+        except (TypeError, ValueError):
+            raise ValueError("invalid_class_id")
+        student_ids = [str(value) for (value,) in self.db.query(Enrollment.student_user_id).filter(Enrollment.class_group_id == class_uuid).distinct().all()]
+        if not student_ids:
+            return {"class_id": class_id, "timeframe_hours": hours, "high_alert_events": 0, "total_events": 0, "stress_ratio_percent": 0.0, "requires_teacher_attention": False}
+
+        # Restrict aggregation to students enrolled in the requested class.
+        class_filter = WellbeingObservation.student_id.in_(student_ids)
         high_alert_count = self.db.query(WellbeingObservation).filter(
-            WellbeingObservation.timestamp >= cutoff_time,
+            class_filter, WellbeingObservation.timestamp >= cutoff_time,
             WellbeingObservation.alert_level >= 2
         ).count()
-        
-        # Celkový počet udalostí za obdobie
         total_observations = self.db.query(WellbeingObservation).filter(
-            WellbeingObservation.timestamp >= cutoff_time
+            class_filter, WellbeingObservation.timestamp >= cutoff_time
         ).count()
         
         # Výpočet pomeru (stress ratio)
@@ -183,7 +191,7 @@ class WellbeingAnalyticService:
             timestamp=datetime.now(timezone.utc)
         )
         self.db.add(observation)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(observation)
         return observation
 
@@ -246,15 +254,23 @@ class WellbeingAnalyticService:
         
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         
-        # Počet udalostí s vysokým alertom (COGNITIVE_OVERLOAD, AVOIDANCE)
+        from app.shared.school import Enrollment
+        try:
+            class_uuid = uuid.UUID(str(class_id))
+        except (TypeError, ValueError):
+            raise ValueError("invalid_class_id")
+        student_ids = [str(value) for (value,) in self.db.query(Enrollment.student_user_id).filter(Enrollment.class_group_id == class_uuid).distinct().all()]
+        if not student_ids:
+            return {"class_id": class_id, "timeframe_hours": hours, "high_alert_events": 0, "total_events": 0, "stress_ratio_percent": 0.0, "requires_teacher_attention": False}
+
+        # Restrict aggregation to students enrolled in the requested class.
+        class_filter = WellbeingObservation.student_id.in_(student_ids)
         high_alert_count = self.db.query(WellbeingObservation).filter(
-            WellbeingObservation.timestamp >= cutoff_time,
+            class_filter, WellbeingObservation.timestamp >= cutoff_time,
             WellbeingObservation.alert_level >= 2
         ).count()
-        
-        # Celkový počet udalostí za obdobie
         total_observations = self.db.query(WellbeingObservation).filter(
-            WellbeingObservation.timestamp >= cutoff_time
+            class_filter, WellbeingObservation.timestamp >= cutoff_time
         ).count()
         
         # Výpočet pomeru (stress ratio)

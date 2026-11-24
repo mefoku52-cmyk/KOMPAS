@@ -45,6 +45,12 @@ class K07Service:
             raise ValueError("item_not_found")
         ctx = self._owner_ctx(principal, item.school_id, item.owner_teacher_user_id)
         self._auth(principal, action, f"teacher_workspace_library_item:{item.id}", ctx)
+        from app.modules.k07_professional_library.domain.models import LibraryVersion
+        existing = self.db.query(LibraryVersion.id).filter(
+            LibraryVersion.item_id == item.id, LibraryVersion.version_number == version_number
+        ).first()
+        if existing is not None:
+            raise ValueError("version_number_exists")
         storage_key = None
         if content_bytes is not None:
             storage_key = f"library/{item.id}/v{version_number}.bin"

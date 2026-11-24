@@ -82,6 +82,7 @@ def test_intervention_endpoint_requires_authorization(db_session):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.core.security.auth import get_current_principal
+    from app.core.database.session import get_db
     from app.core.permissions.policy import Principal
     from app.shared.types import Role  # Alebo kde je definovaný Role enum
     import uuid
@@ -96,7 +97,10 @@ def test_intervention_endpoint_requires_authorization(db_session):
     def override_get_principal():
         return Principal(user_id=student_a_id, role=Role.STUDENT, school_id=school_id)
 
+    def override_db():
+        yield db_session
     app.dependency_overrides[get_current_principal] = override_get_principal
+    app.dependency_overrides[get_db] = override_db
 
     try:
         # 2. Pokus o získanie dát žiaka B s principalom žiaka A
@@ -116,6 +120,7 @@ def test_intervention_endpoint_denies_teacher_without_class(db_session):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.core.security.auth import get_current_principal
+    from app.core.database.session import get_db
     from app.core.permissions.policy import Principal
     from app.shared.types import Role
     import uuid
@@ -128,7 +133,10 @@ def test_intervention_endpoint_denies_teacher_without_class(db_session):
     def override():
         return Principal(user_id=teacher_id, role=Role.TEACHER, school_id=school_id)
 
+    def override_db():
+        yield db_session
     app.dependency_overrides[get_current_principal] = override
+    app.dependency_overrides[get_db] = override_db
     try:
         response = client.get(f"/k17/wellbeing/students/{student_id}/intervention-message")
         assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
@@ -140,6 +148,7 @@ def test_intervention_endpoint_denies_parent_without_guardian_link(db_session):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.core.security.auth import get_current_principal
+    from app.core.database.session import get_db
     from app.core.permissions.policy import Principal
     from app.shared.types import Role
     import uuid
@@ -152,7 +161,10 @@ def test_intervention_endpoint_denies_parent_without_guardian_link(db_session):
     def override():
         return Principal(user_id=parent_id, role=Role.PARENT, school_id=school_id)
 
+    def override_db():
+        yield db_session
     app.dependency_overrides[get_current_principal] = override
+    app.dependency_overrides[get_db] = override_db
     try:
         response = client.get(f"/k17/wellbeing/students/{student_id}/intervention-message")
         assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
@@ -164,6 +176,7 @@ def test_intervention_endpoint_denies_other_school(db_session):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.core.security.auth import get_current_principal
+    from app.core.database.session import get_db
     from app.core.permissions.policy import Principal
     from app.shared.types import Role
     import uuid
@@ -175,7 +188,10 @@ def test_intervention_endpoint_denies_other_school(db_session):
     def override():
         return Principal(user_id=student_id, role=Role.STUDENT, school_id=other_school)
 
+    def override_db():
+        yield db_session
     app.dependency_overrides[get_current_principal] = override
+    app.dependency_overrides[get_db] = override_db
     try:
         # same user id but different school_id in principal; SELF check uses user_id only,
         # so this should still be allowed for self. Instead test a foreign student in other school.
@@ -190,6 +206,7 @@ def test_class_signals_requires_teacher(db_session):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.core.security.auth import get_current_principal
+    from app.core.database.session import get_db
     from app.core.permissions.policy import Principal
     from app.shared.types import Role
     import uuid
@@ -201,7 +218,10 @@ def test_class_signals_requires_teacher(db_session):
     def override():
         return Principal(user_id=principal_id, role=Role.STUDENT, school_id=uuid.uuid4())
 
+    def override_db():
+        yield db_session
     app.dependency_overrides[get_current_principal] = override
+    app.dependency_overrides[get_db] = override_db
     try:
         response = client.get(f"/k17/wellbeing/classes/{class_id}/signals")
         assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
@@ -213,6 +233,7 @@ def test_parent_dashboard_requires_parent(db_session):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.core.security.auth import get_current_principal
+    from app.core.database.session import get_db
     from app.core.permissions.policy import Principal
     from app.shared.types import Role
     import uuid
@@ -222,7 +243,10 @@ def test_parent_dashboard_requires_parent(db_session):
     def override():
         return Principal(user_id=uuid.uuid4(), role=Role.STUDENT, school_id=uuid.uuid4())
 
+    def override_db():
+        yield db_session
     app.dependency_overrides[get_current_principal] = override
+    app.dependency_overrides[get_db] = override_db
     try:
         response = client.get("/k17/wellbeing/parent/dashboard")
         assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
@@ -234,6 +258,7 @@ def test_dismiss_signal_requires_teacher(db_session):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.core.security.auth import get_current_principal
+    from app.core.database.session import get_db
     from app.core.permissions.policy import Principal
     from app.shared.types import Role
     import uuid
@@ -244,7 +269,10 @@ def test_dismiss_signal_requires_teacher(db_session):
     def override():
         return Principal(user_id=uuid.uuid4(), role=Role.STUDENT, school_id=uuid.uuid4())
 
+    def override_db():
+        yield db_session
     app.dependency_overrides[get_current_principal] = override
+    app.dependency_overrides[get_db] = override_db
     try:
         response = client.post(f"/k17/wellbeing/students/{student_id}/signals/dismiss")
         assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
@@ -307,6 +335,7 @@ def test_student_state_hidden_from_student(db_session):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.core.security.auth import get_current_principal
+    from app.core.database.session import get_db
     from app.core.permissions.policy import Principal
     from app.shared.types import Role
     import uuid
@@ -317,7 +346,10 @@ def test_student_state_hidden_from_student(db_session):
     def override():
         return Principal(user_id=student_id, role=Role.STUDENT, school_id=uuid.uuid4())
 
+    def override_db():
+        yield db_session
     app.dependency_overrides[get_current_principal] = override
+    app.dependency_overrides[get_db] = override_db
     try:
         response = client.get(f"/k17/wellbeing/students/{student_id}/state")
         assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"
@@ -329,6 +361,7 @@ def test_student_state_hidden_from_parent(db_session):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.core.security.auth import get_current_principal
+    from app.core.database.session import get_db
     from app.core.permissions.policy import Principal
     from app.shared.types import Role
     import uuid
@@ -339,7 +372,10 @@ def test_student_state_hidden_from_parent(db_session):
     def override():
         return Principal(user_id=uuid.uuid4(), role=Role.PARENT, school_id=uuid.uuid4())
 
+    def override_db():
+        yield db_session
     app.dependency_overrides[get_current_principal] = override
+    app.dependency_overrides[get_db] = override_db
     try:
         response = client.get(f"/k17/wellbeing/students/{student_id}/state")
         assert response.status_code == 403, f"Expected 403, got {response.status_code}: {response.text}"

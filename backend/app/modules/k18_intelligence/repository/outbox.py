@@ -1,7 +1,7 @@
 """K18 outbox/inbox simulation for main KOMPAS DB."""
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import select
+from sqlalchemy import select, UniqueConstraint
 from sqlalchemy.orm import Session
 from app.shared.types import utc_now, new_uuid
 from .models import ILDeadLetter
@@ -12,6 +12,7 @@ from app.core.database.session import Base
 
 class ILOutbox(Base):
     __tablename__ = "il_outbox"
+    __table_args__ = (UniqueConstraint("event_id", name="uq_il_outbox_event_id"),)
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_uuid)
     event_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -25,6 +26,7 @@ class ILOutbox(Base):
 
 class ILInbox(Base):
     __tablename__ = "il_inbox"
+    __table_args__ = (UniqueConstraint("event_id", "handler", name="uq_il_inbox_event_handler"),)
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_uuid)
     event_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     handler: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -36,8 +38,13 @@ class ILInbox(Base):
 
 
 def enqueue_outbox(db: Session, event_id, event_type, payload):
-    db.add(ILOutbox(event_id=event_id, event_type=event_type, payload=payload, status="pending"))
+    existing = db.execute(select(ILOutbox).where(ILOutbox.event_id == event_id)).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    item = ILOutbox(event_id=event_id, event_type=event_type, payload=payload, status="pending")
+    db.add(item)
     db.flush()
+    return item
 
 
 def process_once(db: Session, orchestrator_factory, limit=20):
@@ -53,12 +60,19 @@ def process_once(db: Session, orchestrator_factory, limit=20):
         try:
             orch = orchestrator_factory(db)
             res = orch.process_event(it.event_type, it.payload, source="outbox-worker", event_id=it.event_id, school_id=it.payload.get("school_id"))
-            db.add(ILInbox(event_id=it.event_id, handler=handler, status="done" if res.get("status") != "duplicate" else "duplicate", attempts=1, processed_at=utc_now()))
+            inbox_status = "done" if res.get("status") != "duplicate" else "duplicate"
+            if seen is None:
+                db.add(ILInbox(event_id=it.event_id, handler=handler, status=inbox_status, attempts=it.attempts + 1, processed_at=utc_now()))
+            else:
+                seen.status = inbox_status; seen.attempts = it.attempts + 1; seen.last_error = None; seen.processed_at = utc_now()
             it.status = "done"; it.processed_at = utc_now(); processed += 1
         except Exception as e:
             it.attempts += 1; it.last_error = str(e)
             it.status = "dead_letter" if it.attempts >= 3 else "failed"
-            db.add(ILInbox(event_id=it.event_id, handler=handler, status="failed", attempts=it.attempts, last_error=str(e)))
+            if seen is None:
+                db.add(ILInbox(event_id=it.event_id, handler=handler, status="failed", attempts=it.attempts, last_error=str(e)))
+            else:
+                seen.status = "failed"; seen.attempts = it.attempts; seen.last_error = str(e); seen.processed_at = None
             if it.status == "dead_letter":
                 db.add(ILDeadLetter(event_id=it.event_id, handler=handler, payload=it.payload, error=str(e), retry_count=it.attempts, last_attempt_at=utc_now(), school_id=None))
             failed += 1

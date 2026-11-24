@@ -32,6 +32,7 @@ class LoginRequest(BaseModel):
     username: str
     password: str
     school_id: uuid.UUID | None = None
+    role: Role | None = None
 
 
 class TokenResponse(BaseModel):
@@ -90,8 +91,22 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
     user.failed_login_count = 0
     user.locked_until = None
-    ra = db.execute(select(RoleAssignment).where(RoleAssignment.user_id == user.id)).scalars().first()
-    role = Role(ra.role) if ra else None
+    role_stmt = select(RoleAssignment).where(
+        RoleAssignment.user_id == user.id,
+        RoleAssignment.school_id == user.school_id,
+        RoleAssignment.valid_from <= datetime.now(timezone.utc),
+        (RoleAssignment.valid_to.is_(None) | (RoleAssignment.valid_to > datetime.now(timezone.utc))),
+    )
+    if payload.role is not None:
+        role_stmt = role_stmt.where(RoleAssignment.role == payload.role.value)
+    assignments = db.execute(role_stmt).scalars().all()
+    if not assignments:
+        db.rollback()
+        raise HTTPException(status_code=403, detail="no_active_role_assignment")
+    if payload.role is None and len(assignments) > 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="role_selection_required")
+    role = Role(assignments[0].role)
     principal = Principal(user_id=user.id, role=role, school_id=user.school_id)
     token = create_access_token(user.id, role, user.school_id, password_changed_at=user.password_changed_at)
     audit_write(db, principal, action="auth.login", resource=f"identity_user:{user.id}", purpose="authentication", outcome="success")

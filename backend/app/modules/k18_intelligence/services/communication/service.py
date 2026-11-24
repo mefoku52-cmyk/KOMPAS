@@ -40,6 +40,8 @@ class CommunicationEngine:
         return "teacher.signal.urgent" if initiative.urgency == "high" else "teacher.signal.support"
 
     def compose_and_send(self, initiative, locale="sk"):
+        if getattr(initiative, "status", None) == "pending_approval":
+            return None
         if initiative.decision != "act" and initiative.action_type != "request_more":
             return None
         role = initiative.recipient_role or "teacher"

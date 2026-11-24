@@ -31,9 +31,14 @@ class K14Service:
             audit_write(self.db, principal, action, f"communication_thread:school:{school_id}", None, "denied", {"reason": "wrong_school"})
             raise PermissionError("wrong_school")
         thread = self.repo.create_thread(school_id=school_id, subject=subject, is_private=is_private, created_by_user_id=principal.user_id, is_demo=is_demo)
+        from app.shared.identity import User
         participants = set(participant_user_ids or [])
         if not principal.is_system:
             participants.add(principal.user_id)
+        users = self.db.query(User).filter(User.id.in_(participants)).all() if participants else []
+        valid_ids = {user.id for user in users if user.school_id == school_id and user.is_active}
+        if valid_ids != participants:
+            raise ValueError("participant_not_found_in_school")
         for uid in participants:
             self.repo.add_participant(school_id=school_id, thread_id=thread.id, user_id=uid, is_demo=is_demo)
         audit_write(self.db, principal, action, f"communication_thread:{thread.id}", None, "success", {"is_private": is_private, "participants": len(participants)})

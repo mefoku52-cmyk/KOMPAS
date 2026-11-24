@@ -1,5 +1,6 @@
 import os
 import uuid
+from sqlalchemy.engine import make_url
 from pathlib import Path
 
 import pytest
@@ -45,6 +46,7 @@ import app.modules.k09_class_overview.domain.models  # noqa: F401,E402
 import app.modules.k13_parent_center.domain.models  # noqa: F401,E402
 import app.modules.k16_intelligent_core.domain.models  # noqa: F401,E402
 import app.modules.k19_sis_integration.domain.models  # noqa: F401,E402
+import app.modules.k17_wellbeing_companion.repository.models  # noqa: F401,E402
 
 
 PG_TEST_URL = os.environ.get("KOMPAS_TEST_DATABASE_URL", "")
@@ -103,6 +105,12 @@ def db_session(tmp_path):
         connect_args = {}
         if PG_TEST_URL.startswith("postgres"):
             connect_args = {"startup_params": {"options": "-c statement_timeout=300000"}}
+        db_name = (make_url(PG_TEST_URL).database or "").lower()
+        if os.environ.get("KOMPAS_ALLOW_DESTRUCTIVE_TEST_DB") != "1" or not db_name.endswith(("_test", "_tests", "test")):
+            raise pytest.UsageError(
+                "PostgreSQL tests drop and recreate every mapped table; set KOMPAS_ALLOW_DESTRUCTIVE_TEST_DB=1 "
+                "and use a dedicated database whose name ends with _test or _tests."
+            )
         engine = create_engine(PG_TEST_URL, poolclass=NullPool, connect_args=connect_args, future=True)
         Base.metadata.drop_all(engine)
         Base.metadata.create_all(engine)

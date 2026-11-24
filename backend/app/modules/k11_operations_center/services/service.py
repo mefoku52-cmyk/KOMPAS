@@ -39,8 +39,6 @@ class K11Service:
             ctx = {"school_id": school_id}
         decision = authorize(principal, action, resource, context=ctx, db=self.db)
         if not decision.allowed:
-            if principal.role == Role.TEACHER and principal.school_id == school_id:
-                return
             audit_write(self.db, principal, action, resource, None, "denied", {"reason": decision.reason})
             raise PermissionError(decision.reason)
 
@@ -56,6 +54,9 @@ class K11Service:
         req = self.repo.get_request(request_id)
         if not req:
             raise ValueError("request_not_found")
+        if principal.role != Role.LEADERSHIP and not principal.is_system:
+            audit_write(self.db, principal, action, f"organization_operation_request:{req.id}", None, "denied", {"reason": "leadership_required"})
+            raise PermissionError("leadership_required")
         self._auth(principal, action, f"organization_operation_request:{req.id}", req.school_id, requester_user_id=req.requester_user_id)
         allowed = ALLOWED_TRANSITIONS.get(req.status, set())
         if new_status not in allowed:

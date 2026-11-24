@@ -30,6 +30,11 @@ class K15Service:
         if not principal.is_system and principal.school_id != school_id:
             audit_write(self.db, principal, action, f"organization_project:school:{school_id}", None, "denied", {"reason": "wrong_school"})
             raise PermissionError("wrong_school")
+        from app.shared.identity import User
+        requested = set(member_user_ids or []) | ({principal.user_id} if not principal.is_system else set())
+        users = self.db.query(User).filter(User.id.in_(requested)).all() if requested else []
+        if {u.id for u in users if u.school_id == school_id and u.is_active} != requested:
+            raise ValueError("member_not_found_in_school")
         project = self.repo.create_project(school_id=school_id, title=title, description=description, owner_user_id=principal.user_id, is_demo=is_demo)
         # owner is member
         self.repo.add_member(school_id=school_id, project_id=project.id, user_id=principal.user_id, role="owner", is_demo=is_demo)
@@ -47,6 +52,10 @@ class K15Service:
         if not principal.is_system and project.owner_user_id != principal.user_id:
             audit_write(self.db, principal, action, resource, None, "denied", {"reason": "not_owner"})
             raise PermissionError("not_owner")
+        from app.shared.identity import User
+        member = self.db.get(User, user_id)
+        if member is None or member.school_id != project.school_id or not member.is_active:
+            raise ValueError("member_not_found_in_school")
         m = self.repo.add_member(school_id=project.school_id, project_id=project.id, user_id=user_id, role=role, is_demo=is_demo)
         audit_write(self.db, principal, action, resource, None, "success", {"member": str(user_id)})
         return m

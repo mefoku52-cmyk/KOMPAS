@@ -19,7 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.add_column("sis_identity_map", sa.Column("absent_runs", sa.Integer(), nullable=False, server_default="0"))
-    op.alter_column("sis_identity_map", "absent_runs", server_default=None)
+    with op.batch_alter_table("sis_identity_map") as batch_op:
+        batch_op.alter_column("absent_runs", server_default=None, existing_type=sa.Integer(), existing_nullable=False)
 
 
 def downgrade() -> None:

@@ -62,9 +62,10 @@ def load_openapi_paths() -> set[str]:
     data = json.loads(OPENAPI.read_text(encoding="utf-8"))
     out = set()
     for p, methods in data.get("paths", {}).items():
+        canonical_path = re.sub(r"\{[^/{}]+\}", "{param}", p)
         for m in methods:
             if m.lower() in {"get", "post", "put", "patch", "delete"}:
-                out.add(p)
+                out.add(canonical_path)
     return out
 
 

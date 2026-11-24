@@ -7,10 +7,11 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
 from app.core.audit.logger import write as audit_write
+from app.core.database.session import Base
 from app.core.config.settings import settings
 from app.core.security.auth import hash_password
 from app.integrations.sis.base import RosterSnapshot
@@ -24,12 +25,6 @@ from app.modules.k19_sis_integration.repository.repo import SISRepository
 from app.shared.identity import GuardianLink, RoleAssignment, User
 from app.shared.school import ClassGroup, Enrollment, SchoolYear
 from app.shared.types import Principal, Role, utc_now
-
-try:
-    from app.modules.k09_class_overview.domain.models import ClassTeacherAssignment
-except Exception:  # pragma: no cover
-    ClassTeacherAssignment = None  # type: ignore
-
 
 @dataclass
 class SyncReport:
@@ -70,8 +65,9 @@ class SISProvisioningService:
         self.db = db
         self.repo = SISRepository(db)
 
-    def _audit(self, principal: Principal, action: str, resource: str, outcome: str, details: dict | None = None):
-        audit_write(self.db, principal, action, resource, "sis_sync", outcome, details or {})
+    def _audit(self, principal: Principal, action: str, resource: str, outcome: str, details: dict | None = None, *, dry_run: bool = False):
+        if not dry_run:
+            audit_write(self.db, principal, action, resource, "sis_sync", outcome, details or {})
 
     def _ensure_username(self, school_id: uuid.UUID, base: str) -> str:
         base = _slug(base)
@@ -135,7 +131,7 @@ class SISProvisioningService:
                 self.db.flush()
                 self._ensure_role(user.id, source.school_id, role, dry_run=False)
             report.inc("created", f"{entity_type}s")
-            self._audit(principal, "sis.user.created", f"identity_user:{user.id}", "success", {"source": source.provider_type, "entity_type": entity_type, "external_id": ext.external_id})
+            self._audit(principal, "sis.user.created", f"identity_user:{user.id}", "success", {"source": source.provider_type, "entity_type": entity_type, "external_id": ext.external_id}, dry_run=dry_run)
         else:
             changed = False
             if user.full_name != ext.full_name:
@@ -148,7 +144,8 @@ class SISProvisioningService:
                 changed = True
             self._ensure_role(user.id, source.school_id, role, dry_run=dry_run)
             report.inc("updated" if changed else "unchanged", f"{entity_type}s")
-        self.repo.upsert_identity(school_id=source.school_id, source_id=source.id, provider_type=source.provider_type, entity_type=entity_type, external_id=ext.external_id, internal_id=user.id, external_key=ext.email or ext.username_hint, payload_hash=ph, conflict_state=SISConflictState.RESOLVED.value, conflict_detail=None, seen_at=seen_at, absent_runs=0)
+        if not dry_run:
+            self.repo.upsert_identity(school_id=source.school_id, source_id=source.id, provider_type=source.provider_type, entity_type=entity_type, external_id=ext.external_id, internal_id=user.id, external_key=ext.email or ext.username_hint, payload_hash=ph, conflict_state=SISConflictState.RESOLVED.value, conflict_detail=None, seen_at=seen_at, absent_runs=0)
         return user
 
     def sync_roster(self, *, principal: Principal, source: SISSource, snapshot: RosterSnapshot, mode: str = SISJobMode.FULL.value) -> SyncReport:
@@ -170,7 +167,8 @@ class SISProvisioningService:
         for c in snapshot.classes:
             year_id = year_by_ext.get(c.school_year_external_id or "", default_year.id)
             obj, _ = self._get_or_create_class(source.school_id, year_id, c.name, c.grade, dry_run=dry_run, report=report)
-            self.repo.upsert_identity(school_id=source.school_id, source_id=source.id, provider_type=source.provider_type, entity_type="class", external_id=c.external_id, internal_id=obj.id, external_key=c.name, payload_hash=_payload_hash(c.raw), conflict_state=SISConflictState.RESOLVED.value, seen_at=seen_at)
+            if not dry_run:
+                self.repo.upsert_identity(school_id=source.school_id, source_id=source.id, provider_type=source.provider_type, entity_type="class", external_id=c.external_id, internal_id=obj.id, external_key=c.name, payload_hash=_payload_hash(c.raw), conflict_state=SISConflictState.RESOLVED.value, seen_at=seen_at)
             class_by_ext[c.external_id] = obj
 
         teacher_by_ext: dict[str, User] = {}
@@ -202,7 +200,7 @@ class SISProvisioningService:
                     if not dry_run:
                         existing.class_group_id = cls.id
                     report.inc("updated", "enrollments")
-                    self._audit(principal, "sis.enrollment.changed", f"school_enrollment:{existing.id}", "success", {"student_user_id": str(student.id), "class_group_id": str(cls.id), "external_student": e.student_external_id})
+                    self._audit(principal, "sis.enrollment.changed", f"school_enrollment:{existing.id}", "success", {"student_user_id": str(student.id), "class_group_id": str(cls.id), "external_student": e.student_external_id}, dry_run=dry_run)
                 else:
                     report.inc("unchanged", "enrollments")
             else:
@@ -211,20 +209,20 @@ class SISProvisioningService:
                     self.db.flush()
                 report.inc("created", "enrollments")
         # class teachers
-        if ClassTeacherAssignment is not None:
+        class_teacher_table = Base.metadata.tables.get("school_class_teacher")
+        if class_teacher_table is not None:
             for ct in snapshot.class_teachers:
                 teacher = teacher_by_ext.get(ct.teacher_external_id)
                 cls = class_by_ext.get(ct.class_external_id)
                 if not teacher or not cls:
                     report.conflicts.append({"type": "class_teacher_missing_ref", "teacher": ct.teacher_external_id, "class": ct.class_external_id})
                     continue
-                exists = self.db.execute(select(ClassTeacherAssignment).where(ClassTeacherAssignment.school_id == source.school_id, ClassTeacherAssignment.class_group_id == cls.id, ClassTeacherAssignment.teacher_user_id == teacher.id)).scalar_one_or_none()
+                exists = self.db.execute(select(class_teacher_table.c.id).where(class_teacher_table.c.school_id == source.school_id, class_teacher_table.c.class_group_id == cls.id, class_teacher_table.c.teacher_user_id == teacher.id)).first()
                 if exists:
                     report.inc("unchanged", "class_teachers")
                 else:
                     if not dry_run:
-                        self.db.add(ClassTeacherAssignment(school_id=source.school_id, class_group_id=cls.id, teacher_user_id=teacher.id))
-                        self.db.flush()
+                        self.db.execute(insert(class_teacher_table).values(school_id=source.school_id, class_group_id=cls.id, teacher_user_id=teacher.id))
                     report.inc("created", "class_teachers")
 
         # guardians
@@ -264,7 +262,7 @@ class SISProvisioningService:
                         user.is_active = False
                     deactivated = True
                     report.inc("updated", f"{ident.entity_type}s")
-                    self._audit(principal, "sis.user.deactivated_absent", f"identity_user:{user.id}", "success", {"entity_type": ident.entity_type, "external_id": ident.external_id, "absent_runs": absent_runs})
+                    self._audit(principal, "sis.user.deactivated_absent", f"identity_user:{user.id}", "success", {"entity_type": ident.entity_type, "external_id": ident.external_id, "absent_runs": absent_runs}, dry_run=dry_run)
             report.deactivated_candidates.append({
                 "entity_type": ident.entity_type,
                 "external_id": ident.external_id,
@@ -272,5 +270,6 @@ class SISProvisioningService:
                 "absent_runs": absent_runs,
                 "deactivated": deactivated,
             })
-        self._audit(principal, "sis.sync.completed", f"sis_source:{source.id}", "success", {"mode": mode, "summary": report.as_dict()})
+        if not dry_run:
+            self._audit(principal, "sis.sync.completed", f"sis_source:{source.id}", "success", {"mode": mode, "summary": report.as_dict()})
         return report

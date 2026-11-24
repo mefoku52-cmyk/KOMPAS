@@ -7,7 +7,7 @@ node_modules/
 .next/
 *.log
 .data/
-frontend/src/locales/
+!frontend/src/locales/
 
 *.tsbuildinfo
 

@@ -74,13 +74,50 @@ async def get_student_state(
     return {"student_id": student_id, "state": "neutral", "indicators": []}
 
 @router.post("/students/{student_id}/intervention")
-async def request_intervention(student_id: str, db: Session = Depends(get_db)):
-    """
-    Vygeneruje neutrálny textový podnet pre K-14 (Communication Center).
-    Príklad: 'Všimol som si zmenu v tempe. Chcete pokračovať, alebo si dať 2-minútovú pauzu?'
-    """
-    # Implementácia bude volať WellbeingService.generate_neutral_prompt
-    return {"message": "Pozorujem aktivitu. Ako sa cítite?", "suggested_action": "check_in"}
+async def request_intervention(
+    student_id: str,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    """Return a neutral check-in only to an authorized student or their school staff."""
+    import uuid
+    from sqlalchemy import select
+    from app.core.database.session import Base
+    from app.shared.identity import GuardianLink
+    from app.shared.school import Enrollment
+
+    try:
+        student_uuid = uuid.UUID(student_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_student_id")
+
+    allowed = principal.user_id == student_uuid
+    role = principal.role.value if principal.role else None
+    if not allowed and role == "parent":
+        allowed = db.execute(select(GuardianLink.id).where(
+            GuardianLink.guardian_user_id == principal.user_id,
+            GuardianLink.child_user_id == student_uuid,
+            GuardianLink.school_id == principal.school_id,
+        )).first() is not None
+    elif not allowed and role == "teacher":
+        assignments = Base.metadata.tables.get("school_class_teacher")
+        enrollments = db.execute(select(Enrollment.class_group_id).where(
+            Enrollment.student_user_id == student_uuid, Enrollment.school_id == principal.school_id,
+        )).all()
+        if assignments is not None:
+            allowed = any(db.execute(select(assignments.c.id).where(
+                assignments.c.school_id == principal.school_id,
+                assignments.c.class_group_id == row[0],
+                assignments.c.teacher_user_id == principal.user_id,
+            )).first() is not None for row in enrollments)
+    elif not allowed and role == "leadership":
+        from app.shared.identity import User
+        target = db.get(User, student_uuid)
+        allowed = bool(target and target.school_id == principal.school_id)
+
+    if not allowed:
+        raise HTTPException(status_code=403, detail="student_access_denied")
+    return {"student_id": str(student_uuid), "message": "Pozorujem aktivitu. Ako sa cítite?", "suggested_action": "check_in"}
 
 @router.get("/students/{student_id}/intervention-message")
 async def get_intervention_message(

@@ -45,10 +45,29 @@ def status():
 def ingest_event(body: EventIn, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
     if principal is None:
         raise HTTPException(401, "auth required")
-    orch = IntelligenceOrchestrator(db)
+    if principal.is_system:
+        pass
+    elif principal.role not in (Role.TEACHER, Role.LEADERSHIP):
+        raise HTTPException(403, "event_ingest_forbidden")
+    if body.event_type not in {"teacher_note", "conflict_report"}:
+        raise HTTPException(403, "event_type_not_allowed")
+    target = body.payload.get("entity_id") or body.payload.get("student_user_id") or body.payload.get("student")
+    if not target:
+        raise HTTPException(400, "event_entity_required")
+    from app.modules.k18_intelligence.api.access import can_access_entity
+    entity_type = body.payload.get("entity_type", "student")
+    if not principal.is_system and not can_access_entity(db, principal, entity_type, str(target)):
+        raise HTTPException(403, "event_entity_forbidden")
     import uuid as _uuid
+    try:
+        target_school = _uuid.UUID(body.school_id) if body.school_id else principal.school_id
+    except ValueError as exc:
+        raise HTTPException(400, "invalid_school_id") from exc
+    if not principal.is_system and target_school != principal.school_id:
+        raise HTTPException(403, "event_school_forbidden")
+    orch = IntelligenceOrchestrator(db)
     eid = _uuid.UUID(body.event_id) if body.event_id else None
-    school_id = body.school_id or (str(principal.school_id) if principal.school_id else None)
+    school_id = str(target_school) if target_school else None
     res = orch.process_event(body.event_type, body.payload, source=body.source, school_id=school_id, event_id=eid, locale=body.locale)
     ILStore(db).audit("intelligence.ingest", {"event_type": body.event_type, "event_id": str(eid) if eid else None, "status": res.get("status")}, actor=str(principal.user_id), school_id=principal.school_id)
     db.commit()
@@ -143,10 +162,16 @@ def approve(initiative_id: str, body: ApproveIn, db: Session = Depends(get_db), 
     init = store.get_initiative(iid)
     if not init:
         raise HTTPException(404, "initiative not found")
+    if principal.school_id != init.school_id:
+        raise HTTPException(403, "initiative_school_forbidden")
     if principal.role == Role.TEACHER and init.entity_type == "student":
         require_student_access(db, principal, init.entity_id, action="k18.approve")
     status_val = "approved" if body.approved else "rejected"
     store.update_initiative_status(init.id, status_val, actor=str(principal.user_id))
+    if body.approved:
+        from app.modules.k18_intelligence.services.safety.service import SafetyGovernance
+        from app.modules.k18_intelligence.services.communication.service import CommunicationEngine
+        CommunicationEngine(store, SafetyGovernance(), db).compose_and_send(store.get_initiative(init.id))
     store.audit("initiative.approval", {"approved": body.approved, "note": body.note, "decision_reason": "human_approval"}, actor=str(principal.user_id), entity_type="initiative", entity_id=str(init.id), school_id=principal.school_id)
     db.commit()
     return {"id": str(init.id), "status": status_val}
@@ -224,10 +249,10 @@ def admin_health(db: Session = Depends(get_db), principal: Principal = Depends(g
     return {
         "ok": True,
         "db": {
-            "events": db.execute(select(func.count(ILPerceptionEvent.id))).scalar() or 0,
-            "initiatives": db.execute(select(func.count(ILInitiative.id))).scalar() or 0,
-            "audit": db.execute(select(func.count(ILAudit.id))).scalar() or 0,
-            "dead_letter": db.execute(select(func.count(ILDeadLetter.id))).scalar() or 0,
+            "events": db.execute(select(func.count(ILPerceptionEvent.id)).where(ILPerceptionEvent.school_id == principal.school_id)).scalar() or 0,
+            "initiatives": db.execute(select(func.count(ILInitiative.id)).where(ILInitiative.school_id == principal.school_id)).scalar() or 0,
+            "audit": db.execute(select(func.count(ILAudit.id)).where(ILAudit.school_id == principal.school_id)).scalar() or 0,
+            "dead_letter": db.execute(select(func.count(ILDeadLetter.id)).where(ILDeadLetter.school_id == principal.school_id)).scalar() or 0,
         },
     }
 
@@ -235,7 +260,10 @@ def admin_health(db: Session = Depends(get_db), principal: Principal = Depends(g
 @router.get("/admin/entities")
 def admin_entities(limit: int = 100, db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
     require_leadership(db, principal, action="k18.admin.entities")
-    q = select(ILInitiative.entity_id, ILInitiative.entity_type, func.count(ILInitiative.id), func.max(ILInitiative.created_at)).group_by(ILInitiative.entity_id, ILInitiative.entity_type).order_by(func.max(ILInitiative.created_at).desc()).limit(limit)
+    q = select(ILInitiative.entity_id, ILInitiative.entity_type, func.count(ILInitiative.id), func.max(ILInitiative.created_at))
+    if principal.school_id:
+        q = q.where(ILInitiative.school_id == principal.school_id)
+    q = q.group_by(ILInitiative.entity_id, ILInitiative.entity_type).order_by(func.max(ILInitiative.created_at).desc()).limit(max(1, min(limit, 500)))
     rows = db.execute(q).all()
     return {"items": [{"entity_id": r[0], "entity_type": r[1], "n": r[2], "last_seen": r[3].isoformat() if r[3] else None} for r in rows]}
 
@@ -243,17 +271,19 @@ def admin_entities(limit: int = 100, db: Session = Depends(get_db), principal: P
 @router.get("/report/system")
 def report_system(db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)):
     require_leadership(db, principal, action="k18.report.system")
-    dup = db.execute(select(ILPerceptionEvent.event_id, func.count(ILPerceptionEvent.id)).group_by(ILPerceptionEvent.event_id).having(func.count(ILPerceptionEvent.id) > 1)).all()
+    school_filter = ILPerceptionEvent.school_id == principal.school_id if principal.school_id else ILPerceptionEvent.school_id.is_(None)
+    initiative_filter = ILInitiative.school_id == principal.school_id if principal.school_id else ILInitiative.school_id.is_(None)
+    dup = db.execute(select(ILPerceptionEvent.event_id, func.count(ILPerceptionEvent.id)).where(school_filter).group_by(ILPerceptionEvent.event_id).having(func.count(ILPerceptionEvent.id) > 1)).all()
     return {
         "counts": {
-            "events": db.execute(select(func.count(ILPerceptionEvent.id))).scalar() or 0,
-            "hypotheses": db.execute(select(func.count(ILHypothesis.id))).scalar() or 0,
-            "predictions": db.execute(select(func.count(ILPrediction.id))).scalar() or 0,
-            "initiatives": db.execute(select(func.count(ILInitiative.id))).scalar() or 0,
-            "communications": db.execute(select(func.count(ILCommunication.id))).scalar() or 0,
-            "outcomes": db.execute(select(func.count(ILOutcome.id))).scalar() or 0,
-            "audit": db.execute(select(func.count(ILAudit.id))).scalar() or 0,
-            "dead_letter": db.execute(select(func.count(ILDeadLetter.id))).scalar() or 0,
+            "events": db.execute(select(func.count(ILPerceptionEvent.id)).where(school_filter)).scalar() or 0,
+            "hypotheses": db.execute(select(func.count(ILHypothesis.id)).where(ILHypothesis.school_id == principal.school_id)).scalar() or 0,
+            "predictions": db.execute(select(func.count(ILPrediction.id)).where(ILPrediction.school_id == principal.school_id)).scalar() or 0,
+            "initiatives": db.execute(select(func.count(ILInitiative.id)).where(initiative_filter)).scalar() or 0,
+            "communications": db.execute(select(func.count(ILCommunication.id)).where(ILCommunication.school_id == principal.school_id)).scalar() or 0,
+            "outcomes": db.execute(select(func.count(ILOutcome.id)).where(ILOutcome.school_id == principal.school_id)).scalar() or 0,
+            "audit": db.execute(select(func.count(ILAudit.id)).where(ILAudit.school_id == principal.school_id)).scalar() or 0,
+            "dead_letter": db.execute(select(func.count(ILDeadLetter.id)).where(ILDeadLetter.school_id == principal.school_id)).scalar() or 0,
         },
         "invariants": {
             "all_hypotheses_have_entity": (db.execute(select(func.count(ILHypothesis.id)).where((ILHypothesis.entity_id == None) | (ILHypothesis.entity_id == ""))).scalar() or 0) == 0,  # noqa: E711

@@ -79,7 +79,8 @@ def test_event_handler_integration_with_domain_event():
         
         # Overenie, že handler zapisoval do DB
         mock_db.add.assert_called()
-        mock_db.commit.assert_called()
+        mock_db.flush.assert_called()
+        mock_db.commit.assert_not_called()
 
 def test_get_latest_intervention_message_returns_neutral_text():
     """

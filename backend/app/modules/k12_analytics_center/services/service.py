@@ -31,14 +31,16 @@ class K12Service:
         if principal.is_system:
             return
         ctx = {"school_id": school_id}
-        if principal.role == Role.LEADERSHIP and principal.school_id == school_id:
+        if purpose is not None:
+            ctx = {"scope": Scope.SCHOOL_INDIVIDUAL_WITH_PURPOSE.value, "school_id": school_id, "purpose": purpose}
+        elif principal.role == Role.LEADERSHIP and principal.school_id == school_id:
             ctx = {"scope": Scope.SCHOOL_AGGREGATE.value, "school_id": school_id}
-        elif principal.role == Role.TEACHER and principal.school_id == school_id:
-            ctx = {"school_id": school_id}
         decision = authorize(principal, action, resource, context=ctx, db=self.db)
+        # Same-school teachers may see only the threshold-suppressed school aggregate, never individual data.
+        if (not decision.allowed and purpose is None and action == "k12.get_school_overview"
+                and principal.role == Role.TEACHER and principal.school_id == school_id):
+            decision = type(decision)(True, "teacher_school_aggregate")
         if not decision.allowed:
-            if principal.role == Role.TEACHER and principal.school_id == school_id:
-                return
             audit_write(self.db, principal, action, resource, purpose, "denied", {"reason": decision.reason})
             raise PermissionError(decision.reason)
 

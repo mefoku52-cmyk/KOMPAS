@@ -1,0 +1,9 @@
+{
+  "app": { "title": "KOMPAS", "login": "Prihlásenie", "logout": "Odhlásiť sa" },
+  "auth": { "username": "Používateľské meno", "password": "Heslo", "submit": "Prihlásiť sa", "invalid": "Neplatné údaje" },
+  "roles": { "student": "Žiak", "teacher": "Učiteľ", "leadership": "Vedenie", "parent": "Rodič" },
+  "student": { "title": "Osobný pokrok", "progress": "Stav učiva", "covered": "Prebraté", "practiced": "Precvičené", "verified": "Overené", "assignments": "Zadania", "submitAnswer": "Odovzdať odpoveď" },
+  "teacher": { "title": "Učiteľ", "classOverview": "Triedny prehľad", "library": "Knižnica príprav", "assistant": "Asistent", "assistantNote": "Návrh vyžaduje schválenie učiteľom." },
+  "leadership": { "title": "Vedenie školy", "aggregates": "Agregované prehľady", "tasks": "Organizačné úlohy", "requests": "Prevádzkové požiadavky" },
+  "parent": { "title": "Rodič", "approvedInfo": "Schválené informácie o dieťati", "communication": "Komunikácia" }
+}

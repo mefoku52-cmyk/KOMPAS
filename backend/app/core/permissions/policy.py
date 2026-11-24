@@ -120,7 +120,17 @@ def authorize(principal: Optional[Principal], action: str, resource: str, contex
                     Enrollment.student_user_id == student_id,
                 )
             ).scalar_one_or_none()
-            teacher_of = ctx.get("teacher_user_id") == principal.user_id or ctx.get("teaches", False)
+            assignment_table = __import__("app.core.database.session", fromlist=["Base"]).Base.metadata.tables.get("school_class_teacher")
+            teacher_of = False
+            if assignment_table is not None:
+                assignment = db.execute(
+                    select(assignment_table.c.id).where(
+                        assignment_table.c.class_group_id == class_id,
+                        assignment_table.c.teacher_user_id == principal.user_id,
+                        assignment_table.c.school_id == principal.school_id,
+                    )
+                ).first()
+                teacher_of = assignment is not None
             if enrolled and teacher_of:
                 return _allow("teaches_class")
             if enrolled and not teacher_of:

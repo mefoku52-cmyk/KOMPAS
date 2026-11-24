@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -26,7 +27,14 @@ class EduPageProvider:
     def __init__(self, *, subdomain: str, api_key: str, base_url: str | None = None, timeout_seconds: int | None = None):
         self.subdomain = subdomain.strip().strip(".")
         self.api_key = api_key
-        self.base_url = (base_url or f"https://{self.subdomain}.edupage.org").rstrip("/")
+        candidate = (base_url or f"https://{self.subdomain}.edupage.org").rstrip("/")
+        parsed = urlsplit(candidate)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if (parsed.scheme != "https" or not host.endswith(".edupage.org")
+                or parsed.username or parsed.password or parsed.port
+                or parsed.query or parsed.fragment or parsed.path not in ("", "/")):
+            raise ValueError("invalid_edupage_base_url")
+        self.base_url = f"https://{host}"
         self.timeout_seconds = timeout_seconds or settings.sis_request_timeout_seconds
 
     def _request(self, cmd: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -34,10 +42,12 @@ class EduPageProvider:
         data = {"cmd": cmd, **(params or {})}
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
         try:
-            with httpx.Client(timeout=self.timeout_seconds, follow_redirects=True) as client:
+            with httpx.Client(timeout=self.timeout_seconds, follow_redirects=False) as client:
                 resp = client.post(url, data=data, headers=headers)
         except httpx.HTTPError as exc:
             raise EduPageClientError(f"edupage_request_failed:{exc.__class__.__name__}") from exc
+        if 300 <= resp.status_code < 400:
+            raise EduPageClientError("edupage_redirect_rejected")
         if resp.status_code >= 400:
             raise EduPageClientError(f"edupage_http_{resp.status_code}")
         try:

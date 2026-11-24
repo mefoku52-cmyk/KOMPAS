@@ -37,6 +37,8 @@ def _setup(db_session):
     db_session.add(User(id=teacher_id, school_id=school_id, username=f"t-{teacher_id}", full_name="T", password_hash="x"))
     db_session.add(ClassGroup(id=class_id, school_id=school_id, school_year_id=year_id, name="5A", grade=5))
     db_session.add(Enrollment(school_id=school_id, school_year_id=year_id, class_group_id=class_id, student_user_id=student_id))
+    db_session.flush()
+    db_session.execute(insert(Base.metadata.tables["school_class_teacher"]).values(id=uuid.uuid4(), school_id=school_id, class_group_id=class_id, teacher_user_id=teacher_id))
     db_session.commit()
     return dict(school_id=school_id, student_id=student_id, teacher_id=teacher_id, class_id=class_id, t1=t1, t2=t2, t3=t3)
 
@@ -88,8 +90,10 @@ def test_k03_permissions(db_session):
     teacher = Principal(user_id=ctx["teacher_id"], role=Role.TEACHER, school_id=ctx["school_id"])
     ok = svc.recommend_for_student(teacher, school_id=ctx["school_id"], student_user_id=ctx["student_id"], class_group_id=ctx["class_id"], teaches=True)
     assert isinstance(ok, list)
+    assert isinstance(svc.recommend_for_student(teacher, school_id=ctx["school_id"], student_user_id=ctx["student_id"], class_group_id=ctx["class_id"], teaches=False), list)
+    unassigned_teacher = Principal(user_id=uuid.uuid4(), role=Role.TEACHER, school_id=ctx["school_id"])
     with pytest.raises(PermissionError):
-        svc.recommend_for_student(teacher, school_id=ctx["school_id"], student_user_id=ctx["student_id"], class_group_id=ctx["class_id"], teaches=False)
+        svc.recommend_for_student(unassigned_teacher, school_id=ctx["school_id"], student_user_id=ctx["student_id"], class_group_id=ctx["class_id"], teaches=True)
     stranger = Principal(user_id=uuid.uuid4(), role=Role.STUDENT, school_id=ctx["school_id"])
     with pytest.raises(PermissionError):
         svc.recommend_for_student(stranger, school_id=ctx["school_id"], student_user_id=ctx["student_id"])
