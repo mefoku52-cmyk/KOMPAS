@@ -16,9 +16,15 @@ if env_path.exists():
         if not line or line.startswith("#") or "=" not in line:
             continue
         k, v = line.split("=", 1)
-        os.environ.setdefault(k, v)
+        if k not in {"DATABASE_URL", "KOMPAS_TEST_DATABASE_URL"}:
+            os.environ.setdefault(k, v)
 
-os.environ.setdefault("DATABASE_URL", f"sqlite:///{ROOT}/.data/test_phase1.db")
+# Never let pytest inherit the application's .env database: integration tests
+# include drop_all() and must only run against a dedicated test database.
+os.environ["DATABASE_URL"] = os.environ.get(
+    "KOMPAS_TEST_DATABASE_URL",
+    f"sqlite:///{ROOT}/.data/test_phase1.db",
+)
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-0123456789abcdef")
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 
